@@ -1,5 +1,7 @@
 # [YoloCR](https://bitbucket.org/YuriZero/yolocr/src)
 
+mod
+
 ## For noobs
 Install the requirements with the Ubuntu 20.04 (Focal Fossa) installation script.
 You can install Ubuntu 20.04 inside a virtual machine like Virtualbox.
