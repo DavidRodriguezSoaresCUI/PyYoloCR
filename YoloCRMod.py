@@ -72,7 +72,7 @@ def check_ext_programs() -> bool:
 
     GUI_mode = True
 
-    software_not_found_msg = lambda x: f"Could not retrieve {x[0]}'s version. Make sure it is installed on this system and '{' '.join(x)}' can be called on your shell."
+    software_not_found_msg = lambda x: f"Could not retrieve {x[0]}'s version. Make sure it is installed on this system and '{' '.join(x)}' can be called on your shell." if isinstance(x,list) else f"Could not retrieve {x[0][0]}'s version. Make sure it is installed on this system and `{'` or `'.join(' '.join(y) for y in x)}` can be called on your shell."
 
     def no_mandatory_prg( __call ):
         LOG.error( software_not_found_msg(__call) )
@@ -86,17 +86,17 @@ def check_ext_programs() -> bool:
     programs = [
         {
             'call': [ 'ffmpeg', '-version' ],
-            're.version': r'ffmpeg version ([\d.]+)',
+            're.version': r'ffmpeg version (\d[\d.\-]+\d)',
             'failure': no_mandatory_prg
         },
         {
             'call': [ 'ffprobe', '-version' ],
-            're.version': r'ffprobe version ([\d.]+)',
+            're.version': r'ffprobe version (\d[\d.\-]+\d)',
             'failure': no_mandatory_prg
         },
         {
-            'call': [ 'tesseract', '-v' ],
-            're.version': r'tesseract ([\d.]+)',
+            'call': ([ 'tesseract', '-v' ], [ 'tesseract', '--version' ]),
+            're.version': r'tesseract v?([\d.]+)',
             'failure': no_mandatory_prg
         },
         {
@@ -106,16 +106,32 @@ def check_ext_programs() -> bool:
         }
     ]
 
-    for prg in programs:
-        __call = prg['call']
+    def check_program( prg, __call ):
         stdX = execute( __call )
         try:
             version = re.search( prg['re.version'], stdX['stdout'] ).group(1)
             assert version and (stdX['stderr'] is None)
-            LOG.info( f"Found {__call[0]} {version} !" )
         except Exception as e:
             LOG.error( e )
-            prg['failure']( __call )
+            return
+        return version
+
+
+    for prg in programs:
+        __call = prg['call']
+        if isinstance( __call, tuple ):
+            prg_name = __call[0][0]
+            for __alt_call in __call:
+                version = check_program( prg, __alt_call )
+                if version:
+                    break
+        else:
+            prg_name = __call[0]
+            version = check_program( prg, __call )
+        if version:
+            LOG.info( f"Found {prg_name} {version} !" )
+            continue
+        prg['failure']( __call )
 
     return GUI_mode
 
@@ -240,14 +256,14 @@ class Interval:
         self.b += padding
 
         
-def OCR_Tesseract( img: Path ) -> dict:
+def OCR_Tesseract( img: Path, lang: str ) -> dict:
     from pytesseract import Output
     tmp = {
         k:v[4:]
         for k,v in pytesseract.image_to_data( 
             str(img),
-            lang='eng',
-            config="--tessdata-dir ./tessdata --oem 0",
+            lang=lang,
+            config=Tesseract_CFG,
             output_type=Output.DICT
         ).items()
         if k=='conf' or k=='text'
@@ -257,33 +273,32 @@ def OCR_Tesseract( img: Path ) -> dict:
     tmp['len'] = _len_txt
     return tmp
 
-
 def guess_text( ocr_data ):
+    # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
+    from statistics import mode
+    text_length = mode( [ x['len'] for x in ocr_data ] )
+    ocr_data = list( filter( lambda x: x['len']==text_length, ocr_data) )
 
-        # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
-        from statistics import mode
-        text_length = mode( [ x['len'] for x in ocr_data ] )
-        ocr_data = list( filter( lambda x: x['len']==text_length, ocr_data) )
+    # 2nd : We assume that every frame tried to read the same words. 
+    # Then, for each word we choose the variation that has highest confidence
+    from collections import defaultdict
+    any2int = lambda x: x if isinstance(x,int) else ( int(x) if isinstance(x,float) else int(float(x)))
+    words = [ defaultdict( lambda: 0 ) for _ in range(text_length) ]
+    for frame in ocr_data:
+        text, conf = frame['text'], frame['conf']
+        for i in range(text_length):
+            (words[i])[ text[i] ] += any2int( conf[i] )
 
-        # 2nd : We assume that every frame tried to read the same words. 
-        # Then, for each word we choose the variation that has highest confidence
-        from collections import defaultdict
-        words = [ defaultdict( lambda: 0 ) for _ in range(text_length) ]
-        for frame in ocr_data:
-            text, conf = frame['text'], frame['conf']
-            for i in range(text_length):
-                (words[i])[ text[i] ] += conf[i]
-
-        guess = ' '.join( [
-            max(word, key=word.get) # get word variation with highest combined confidence
-            for word in words
-        ])
-        return guess
+    guess = ' '.join( [
+        max(word, key=word.get) # get word variation with highest combined confidence
+        for word in words
+    ])
+    return guess
 
 
-def OCR_scene( scene_id ) -> str:
+def OCR_scene( scene_id: int, lang: str ) -> str:
     ocr_data = [ 
-        OCR_Tesseract( img ) 
+        OCR_Tesseract( img, lang ) 
         for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
     ]
     return guess_text( ocr_data )
@@ -342,13 +357,15 @@ if __name__=='__main__':
     import sys,re
 
     import logging
-    logging.basicConfig( level=logging.INFO )
+    logging.basicConfig( level=logging.DEBUG )
     LOG = logging.getLogger( "YoloCR" )
 
     # Retrieve tesseract langs
-    # T_lang = pytesseract.get_languages(config='')
-    # lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
-    # LOG.info(f"Selected video file {lang}")
+    local_tessdata = Path('./tessdata')
+    Tesseract_CFG = f"--tessdata-dir {local_tessdata.resolve()}" if local_tessdata.is_dir() else ""
+    T_lang = pytesseract.get_languages(config=Tesseract_CFG)
+    lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
+    LOG.info(f"Selected video file {lang}")
 
     # # # Make sure arg1 is the filtered video file
     # video = select_file( "deo file Video file" )
@@ -499,7 +516,7 @@ if __name__=='__main__':
         for idx,scene in enumerate(scenes):
             subtitles[idx] = {
                 'scene': scene ,
-                'text' : OCR_scene(idx)
+                'text' : OCR_scene(idx, lang)
             }
             bar.next()
         bar.finish()

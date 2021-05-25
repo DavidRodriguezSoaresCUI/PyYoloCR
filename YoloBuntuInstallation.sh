@@ -26,25 +26,21 @@ if [ ! -z $DISPLAY ]; then
 fi
 
 sudo apt update
-sudo apt install bc gawk curl tesseract-ocr imagemagick links parallel ffmpeg git build-essential autoconf automake libtool pkg-config python3-dev cython3 libffms2-4 libarchive-tools $DesktopPkg
-if [[ $1 != eng-only ]]
-	then sudo apt install tesseract-ocr-fra
-		 wget https://github.com/tesseract-ocr/tessdata/blob/master/fra.traineddata?raw=true -O tessdata/fra.traineddata
-	else wget https://github.com/tesseract-ocr/tessdata/blob/master/eng.traineddata?raw=true -O tessdata/eng.traineddata
-fi
+sudo apt install bc gawk curl tesseract-ocr imagemagick ffmpeg git build-essential autoconf automake libtool pkg-config python3-dev cython3 libffms2-4 libarchive-tools $DesktopPkg
+wget https://github.com/tesseract-ocr/tessdata/blob/master/eng.traineddata?raw=true -O tessdata/eng.traineddata
 mkdir Gits; cd Gits
 
-# Installation de zimg
+# zimg install
 git clone https://github.com/sekrit-twc/zimg.git; cd zimg
 ./autogen.sh && ./configure && make -j$(nproc)
 sudo make install; cd ..
 
-# Installation de Vapoursynth
+# Vapoursynth install
 git clone https://github.com/vapoursynth/vapoursynth.git; cd vapoursynth
 ./autogen.sh && ./configure && make -j$(nproc)
 sudo make install; cd ..
 
-# Installation de Vapoursynth Editor
+# Vapoursynth Editor install
 if [ ! -z $DISPLAY ]; then
 	git clone https://bitbucket.org/mystery_keeper/vapoursynth-editor.git; cd vapoursynth-editor/pro
 	qmake -qt5 && make -j$(nproc); cd ..

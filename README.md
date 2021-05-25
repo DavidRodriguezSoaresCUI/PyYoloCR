@@ -1,14 +1,18 @@
-# [YoloCR](https://bitbucket.org/YuriZero/yolocr/src)
+# [PyYoloCR](https://gitlab.com/DRSCUI/pyyolocr)
 
-testmod
+## About PyYoloCR
+This is a Bash $\to$ Python 3.6+ re-implementation of the original [YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user YuriZero (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9))
 
-## For noobs
-Install the requirements with the Ubuntu 20.04 (Focal Fossa) installation script.
-You can install Ubuntu 20.04 inside a virtual machine like Virtualbox.
+### Why go through the trouble of re-implementing working software ?
+I needed an easy, low effort and automated way to extract hardcoded subtitles (subtitles in the video stream, not in a dedicated subtitle stream). There are multiple open-source projects that share the same user need and I tried some with little success, so I chose __YoloCR__ as a base and modded it.
+
+### Key improvements
+ * __OCR performance__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_.
+ * __Maintainability__ : While the original `bash` code is functional and compact, it's arguably harder to maintain than a program written in a high-level language
 
 ## Requirements
 
-* ffmpeg
+* [FFmpeg](https://ffmpeg.org/) : should be callable from the command line
 * Vapoursynth R36+
 	* plugins for Vapoursynth: 
 		* [FFMS2](https://github.com/FFMS/ffms2)
@@ -19,49 +23,32 @@ You can install Ubuntu 20.04 inside a virtual machine like Virtualbox.
 	* note:
 		* Vapoursynth plugins (.so on Unix, .dll on Windows) should be placed inside one of theses directories: http://www.vapoursynth.com/doc/autoloading.html
 		* Vapoursynth scripts (.py) should be placed inside the "site-packages" directory of your Python3 installation.
-	* [Vapoursynth Editor](https://bitbucket.org/mystery_keeper/vapoursynth-editor)
+* [Vapoursynth Editor](https://bitbucket.org/mystery_keeper/vapoursynth-editor)
+* OCR tool : for now only [Tesseract](https://github.com/tesseract-ocr/tesseract) is supported. Windows users can find binaries [here](https://github.com/UB-Mannheim/tesseract/wiki).
 
 ### Unix/Linux Requirements
 
-* Tesseract-OCR (we recommend version 3.03+)
+__Note__ : For Ubuntu 20.04, all the requirements can be installed with the YoloBuntuInstallation script : `sh YoloBuntuInstallation.sh`
+
+* Tesseract-OCR (version 4 recommended)
 	* and install the data corresponding to the languages you want to OCR
 	* Imagemagick is required if you use LSTM engine
-* links
 * sxiv (Simple X Image Viewer) (GUI mode only)
 * xdotool (Linux only, GUI mode only)
-* parallel (GNU Parallel)
 
 > *Note*: most of these package, with the exception of all the plugins for vapoursynth, are available as official package for your distro.
-
-> For Ubuntu 20.04, all the requirements can be installed with the YoloBuntuInstallation script : `sh YoloBuntuInstallation.sh eng-only`
 
 > For Ubuntu, *vapoursynth*, *vapoursynth-editor* and  *vapoursynth-extra-plugins* (to install all the mandatory plugins above) are available through this ppa: [`ppa:djcj/vapoursynth`](https://launchpad.net/~djcj/+archive/ubuntu/vapoursynth)
 
 ### Windows Requirements
+ * FFmpeg : Download "ffmpeg-git-full.7z" from [this page](https://www.gyan.dev/ffmpeg/builds/) and follow [this tutorial](https://www.thewindowsclub.com/how-to-install-ffmpeg-on-windows-10) for installation instructions.
+ 
+ * Vapoursynth : Follow [these instructions](http://www.vapoursynth.com/doc/installation.html), which includes installing a recent version of `Python`.
+	* When installing `Python`, make sure to check the `Install for all users` and `Add to PATH` boxes, and restart your computer for changes to take effect.
 
-* [Cygwin](https://www.cygwin.com/). During the install, activate:
-	* bc
-	* gnupg
-	* links
-	* make
-	* perl
-	* wget
-	* tesseract-ocr
-	* tesseract-ocr-eng
+ * Vapoursynth Editor : You can find the latest portable binaries from [its official download page](https://bitbucket.org/mystery_keeper/vapoursynth-editor/downloads/). No install needed, just decompress it !
 
-> You can use ABBYY FineReader instead of Tesseract.
-
-* Install `GNU Parallel` from the Cygwin terminal:
-	* `wget -O - pi.dk/3 | bash`
-	* `if [ -f ~/bin/parallel ]; then mv ~/bin/parallel /usr/local/bin/; fi`
-
-> *Note*: Cygwin terminal usage here → [https://help.ubuntu.com/community/UsingTheTerminal](https://help.ubuntu.com/community/UsingTheTerminal)
-
-> C drive path is "/cygdrive/c".
-
-> Scripts have to be used within Cygwin terminal.
-
-> If you use Windows 10, you can install BashOnWindows instead of Cygwin.
+ * Tesseract : You can find installers [here](https://github.com/UB-Mannheim/tesseract/wiki).
 
 ## How to use?
 
