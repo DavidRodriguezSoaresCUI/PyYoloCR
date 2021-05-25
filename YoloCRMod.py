@@ -1,0 +1,557 @@
+# <script call> <filterdvideo:str> <[opt]lang:str>
+
+from typing import List, Union, Set
+from pathlib import Path
+
+def execute( call: Union[str,List[str]] ) -> dict():
+    from subprocess import Popen, STDOUT, PIPE
+    try:
+        stdX = Popen(
+            call,
+            stdout=PIPE, 
+            stderr=STDOUT
+        ).communicate()
+    except Exception as e:
+        logging.getLogger('YoloCR').error(f"execute: the following error was raised when executing {call} : {e}")
+        stdX = [None]*2
+    names = ['stdout','stderr']
+    return {
+        names[i]:(stdX[i].decode('utf8') if stdX[i] else None)
+        for i in range(2)
+    }
+
+def debugvar( v, vname ):
+    print(f"DEBUG: {vname}={v} ({type(v)})")
+
+
+def ensure_min_python( min_ver: List[int] = [3,6] ):
+    # Raise error on older Python versions
+    import platform
+    curr_ver_s = platform.python_version()
+    curr_ver = [ int(s) for s in curr_ver_s.split('.')[0:2] ]
+    
+    _len = min(len(curr_ver),len(min_ver))
+    for i in range(_len):
+        assert curr_ver[i]>=min_ver[i], f"Current python interpreter is too old ({curr_ver_s}<{'.'.join([str(s) for s in min_ver])}) ! "
+
+
+def __input( msg: str ) -> str:
+    try:
+        return input(msg)
+    except KeyboardInterrupt:
+        import sys
+        print("\nKEYBOARDINTERRUPT")
+        sys.exit(1)
+
+def choose( choices: List[str], msg: str = 'Choice' ) -> str:
+    while True:
+        print(f"Choices : ")
+        for i,c in enumerate(choices):
+            print(f"[{i}] {c}")
+        try:
+            return choices[int(__input(f"{msg} : "))]
+        except ValueError:
+            print("Invalid choice")
+        except IndexError:
+            print("Invalid choice")
+
+
+def select_file( msg: str ) -> Path:
+    while True:
+        f = Path(__input(msg + ' : '))
+        if f.is_file():
+            return f.resolve()
+        print(f"Error: '{f}' not found or is not a file.")
+
+
+def check_ext_programs() -> bool:
+    ''' Ensures required and optional external programs can be called, and display their version.
+    Exits on error with required programs.
+    Returns GUI mode [bool]
+    '''
+
+    GUI_mode = True
+
+    software_not_found_msg = lambda x: f"Could not retrieve {x[0]}'s version. Make sure it is installed on this system and '{' '.join(x)}' can be called on your shell."
+
+    def no_mandatory_prg( __call ):
+        LOG.error( software_not_found_msg(__call) )
+        sys.exit(1)
+
+    def no_sxiv( *args ):
+        LOG.warning("sxiv was not found on this system. GUI interactive mode disabled")
+        global GUI_mode
+        GUI_mode = False
+
+    programs = [
+        {
+            'call': [ 'ffmpeg', '-version' ],
+            're.version': r'ffmpeg version ([\d.]+)',
+            'failure': no_mandatory_prg
+        },
+        {
+            'call': [ 'ffprobe', '-version' ],
+            're.version': r'ffprobe version ([\d.]+)',
+            'failure': no_mandatory_prg
+        },
+        {
+            'call': [ 'tesseract', '-v' ],
+            're.version': r'tesseract ([\d.]+)',
+            'failure': no_mandatory_prg
+        },
+        {
+            'call': [ 'sxiv', '-v' ],
+            're.version': r'sxiv ([\d.]+)',
+            'failure': no_sxiv
+        }
+    ]
+
+    for prg in programs:
+        __call = prg['call']
+        stdX = execute( __call )
+        try:
+            version = re.search( prg['re.version'], stdX['stdout'] ).group(1)
+            assert version and (stdX['stderr'] is None)
+            LOG.info( f"Found {__call[0]} {version} !" )
+        except Exception as e:
+            LOG.error( e )
+            prg['failure']( __call )
+
+    return GUI_mode
+
+
+def frame2timestamp_SRT( frame, fps ):
+    s = frame/fps
+    import time
+    return time.strftime("%H:%M:%S,", time.gmtime(s)) + f"{int(1000*(s-int(s))):03d}"
+
+
+def frame2timestamp( frame, fps ):
+    s = frame/fps
+    # return f"{int(s//3600):02d}h{int((s%3600)//60):02d}m{int(s%60):02d}s{int(1000*(s-int(s))):03d}"
+    import time
+    return time.strftime("%Hh%Mm%Ss", time.gmtime(s)) + f"{int(1000*(s-int(s))):03d}"
+
+
+class Interval:
+    def __init__(self, a: int, b: int ) -> None:
+        assert a < b and isinstance(a,int) and isinstance(b,int)
+        self.a = a
+        self.b = b
+
+    @classmethod
+    def from_list( cls, l: List[int], min_interval: int = 1, split_list: List[int] = None ) -> List:
+        a = b = None
+        intervals = set()
+
+        for i in l:
+            if a is None:
+                # Interval begins
+                a = b = i
+                continue
+
+            if i == b+1:
+                # Interval continues
+                b = i
+                continue
+            
+            # Interval ends
+            if a + min_interval <= b:
+                intervals.add( Interval( a, b ) )
+                
+            a = b = i
+
+        if a and a + min_interval <= b:
+            # Last Interval ends
+            intervals.add( Interval( a, b ) )
+
+        # Applying `split_list`
+        def interval2split( i ):
+            for interval in intervals:
+                if interval.contains( i ):
+                    return interval
+
+        split_list_useful = False
+        for split_i in split_list:
+            interval_to_split = interval2split( split_i )
+            if interval_to_split is None:
+                continue
+            # `split_i` in `interval`
+            tentative_split = interval_to_split.split( split_i, min_interval )
+            if tentative_split is None:
+                continue
+            # successful split : replace `interval_to_split` with intervals in `tentative_split` in `intervals`
+            LOG.info(f"Split interval : {repr(interval_to_split)} -> {repr(tentative_split[0])} + {repr(tentative_split[1])}")
+            split_list_useful = True
+            intervals.discard( interval_to_split )
+            intervals.add( tentative_split[0] )
+            intervals.add( tentative_split[1] )
+
+        if not split_list_useful:
+            LOG.info(f"No interval was split from 'split_list' :(")
+
+        return list( sorted( intervals, key=lambda x: x.a ) )
+
+
+    @classmethod
+    def join( cls, intervals:list ):
+        return Interval( intervals[0].a, intervals[-1].b)
+
+    @property
+    def len( self ):
+        return self.b-self.a
+
+    def contains( self, val, inclusive: bool = True ):
+        return (self.a <= val and val <= self.b) if inclusive else (self.a < val and val < self.b)
+
+    def split( self, at: int, min_interval: int = 1 ) -> List:
+        ''' [a,b] -> [a,at], [at+1,b] '''
+        if not self.contains( at, inclusive=False ):
+            return None
+        
+        try:
+            res = [ Interval(self.a,at), Interval(at+1,self.b) ]
+        except AssertionError:
+            return None 
+        if all( [ interval.len >= min_interval for interval in res ] ):
+            return res
+
+    def __repr__( self ):
+        return f"{self.a}->{self.b}"
+
+    def timestamp_SRT( self, fps: float ) -> str:
+        return ' --> '.join(
+            [
+                frame2timestamp_SRT(x, fps)
+                for x in [self.a,self.b]
+            ]
+        )
+
+    def timestamp( self, fps: float ) -> str:
+        return '-'.join(
+            [
+                frame2timestamp(x, fps)
+                for x in [self.a,self.b]
+            ]
+        )
+
+    def add_padding( self, padding: int ):
+        self.a -= padding
+        self.b += padding
+
+        
+def OCR_Tesseract( img: Path ) -> dict:
+    from pytesseract import Output
+    tmp = {
+        k:v[4:]
+        for k,v in pytesseract.image_to_data( 
+            str(img),
+            lang='eng',
+            config="--tessdata-dir ./tessdata --oem 0",
+            output_type=Output.DICT
+        ).items()
+        if k=='conf' or k=='text'
+    }
+    _len_txt = len(tmp['text'])
+    assert len(tmp['conf']) == _len_txt
+    tmp['len'] = _len_txt
+    return tmp
+
+
+def guess_text( ocr_data ):
+
+        # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
+        from statistics import mode
+        text_length = mode( [ x['len'] for x in ocr_data ] )
+        ocr_data = list( filter( lambda x: x['len']==text_length, ocr_data) )
+
+        # 2nd : We assume that every frame tried to read the same words. 
+        # Then, for each word we choose the variation that has highest confidence
+        from collections import defaultdict
+        words = [ defaultdict( lambda: 0 ) for _ in range(text_length) ]
+        for frame in ocr_data:
+            text, conf = frame['text'], frame['conf']
+            for i in range(text_length):
+                (words[i])[ text[i] ] += conf[i]
+
+        guess = ' '.join( [
+            max(word, key=word.get) # get word variation with highest combined confidence
+            for word in words
+        ])
+        return guess
+
+
+def OCR_scene( scene_id ) -> str:
+    ocr_data = [ 
+        OCR_Tesseract( img ) 
+        for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
+    ]
+    return guess_text( ocr_data )
+
+
+def deduplicate_subtitles( subtitles ):
+    
+    get_scene = lambda x: subtitles[x]['scene']
+    get_text  = lambda x: subtitles[x]['text']
+    nb_sub = len(subtitles)
+
+    subtitles_ok = list()
+    curr_sc = get_scene(0)
+    curr_tx = get_text(0)
+    for i in range(1, nb_sub):
+        tmp_txt = get_text(i)
+        if tmp_txt!=curr_tx:
+            # curr_subtitle ended
+            subtitles_ok.append( {
+                'scene': curr_sc,
+                'text' : curr_tx
+            })
+            curr_sc = get_scene(i)
+            curr_tx = tmp_txt
+        else:
+            # joining subtitles
+            curr_sc = Interval.join( [ curr_sc, get_scene(i) ] )
+    
+    # Ending last subtitle
+    subtitles_ok.append( {
+        'scene': curr_sc,
+        'text' : curr_tx
+    })
+
+    return subtitles_ok
+    
+
+
+
+
+if __name__=='__main__':
+
+    img_fmt = 'jpg'
+    READONLY = True
+    sub_padding = 16 # Padding for subtitles, in frames
+
+    # Require Python >=3.6
+    ensure_min_python( [3,6] )
+
+    try:
+        import pytesseract
+        from PIL import Image
+        from progress.bar import Bar
+    except ImportError as e:
+        raise ImportError(f"The following error occurred : '{e}'. This may be caused by missing required libraries. Please run 'python3 -m pip install -r requirements'.")
+    import sys,re
+
+    import logging
+    logging.basicConfig( level=logging.INFO )
+    LOG = logging.getLogger( "YoloCR" )
+
+    # Retrieve tesseract langs
+    # T_lang = pytesseract.get_languages(config='')
+    # lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
+    # LOG.info(f"Selected video file {lang}")
+
+    # # # Make sure arg1 is the filtered video file
+    # video = select_file( "deo file Video file" )
+    video_ori = Path('Neko Vampire Elli (sub).mp4').resolve()
+    video = Path('Filtered_video.mp4').resolve()
+    LOG.info(f"Selected video file : {video}\n")
+
+
+    # Check for external programs
+    LOG.info("Checking for external dependencies ..")
+    GUI_mode = check_ext_programs()    
+    LOG.info("Checking for external dependencies OK\n")
+            
+
+    # `FilteredScreens` : if exist, remove all `img_fmt` files, else mkdir.
+    LOG.info("Preparing folder for screens ..")
+    filteredScreensDir = Path('FilteredScreens').resolve()
+    if filteredScreensDir.is_dir():
+        LOG.info(f"Found {filteredScreensDir}")
+        files2remove = list(filteredScreensDir.glob(f'*.{img_fmt}'))
+        if files2remove and not READONLY:
+            LOG.info(f"Removing {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ..")
+            for f in files2remove:
+                f.unlink()
+    else:
+        LOG.info(f"Created {filteredScreensDir}")
+        filteredScreensDir.mkdir()
+    LOG.info("Preparing folder for screens OK\n")
+
+
+
+    # Use ffprobe to obtain FPS for video file
+    # stdX = execute( ["ffprobe", str(video), '-v ', '-select_streams v', '-print_format flat', '-show_entries stream=r_frame_rate'] )
+    ffprobe_FPS_stdX = execute( ["ffprobe", '-v', '0', '-select_streams', 'v', '-print_format', 'flat', '-of', 'default=noprint_wrappers=1:nokey=1', '-show_entries', 'stream=r_frame_rate', str(video)] )
+    assert ffprobe_FPS_stdX['stdout'] and ffprobe_FPS_stdX['stderr'] is None
+    video_FPS = eval(ffprobe_FPS_stdX['stdout'].rstrip())
+    #debugvar(video_FPS,'video_FPS')
+
+
+    # Load `SceneChanges.log`, process it to make timecoded scenes. Do the same for `SceneChangesAlt.log`
+    LOG.info(f"Loading SceneChange files ..")
+    SceneChangeFiles = {
+        'primary': Path('SceneChanges.log'),
+        'alt'    : Path('SceneChangesAlt.log'),
+    }
+    Scenes = dict()
+    for label,SCfile in SceneChangeFiles.items():
+        if not SCfile.is_file():
+            LOG.info(f"{SCfile} doesn't exits.")
+            continue
+        tmp = decodeSC( SCfile.read_text().splitlines()[1:] )
+        Scenes[label] = tmp
+        LOG.info(f"{SCfile} contained {len(tmp)} scenes !")
+    LOG.info(f"Loading SceneChange files OK\n")
+
+    # DEPRECATED SECTION
+    # Use ffmpeg to extract scenechange frames to jpg
+    # `ffmpeg -loglevel error -ss $(echo "if ($b-$a-0.003>2/'$FPS') x=($b+$a)/2 else x=$a; if (x<1) print 0; x" | bc -l) -i '\"$FilteredVideo\"' -vframes 1 '$Crop' ScreensFiltrés/$(convertsecs "$a")-$(convertsecs "$b").jpg`
+    # call command from https://superuser.com/questions/1009969/how-to-extract-a-frame-out-of-a-video-using-ffmpeg and https://video.stackexchange.com/questions/19873/extract-specific-video-frames
+    # LOG.info(f"Generating frames from video ..")
+
+    # out_file_fmt = str( filteredScreensDir / 'a.tmp' ).replace( 'a.tmp', '{}_scene{}-{}.'+img_fmt )
+    # out_file = lambda label,sceneidx: out_file_fmt.format( label, sceneidx, '%d' )
+
+    # res = [
+    #     [
+    #         'ffmpeg', 
+    #         '-i', str(video),
+    #         '-vf', f"select=between(n\,{scene['start']['frame']}\,{scene['stop']['frame']})",
+    #         '-frames', str(scene['stop']['frame'] - scene['start']['frame'] + 1),
+    #         '-vsync', '0',
+    #         out_file( label, idx )
+    #     ]
+    #     for label, scenes in Scenes.items()
+    #     for idx,scene in enumerate(scenes)
+    # ]
+    # # from pprint import pformat
+    # # Path('debug.log').write_text(pformat(res))
+    # # for idx,__call in enumerate(res):
+    # #     LOG.info( f"Processing scene {idx} .." )
+    # #     execute( __call )
+
+    # LOG.info(f"Generating frames from video OK")
+
+
+    # Scene Detection : Combination of stats : NonBlackFrames and SceneChanges
+    stat_nonblackframes_f = Path('stat_nonblackframes.log')
+    assert stat_nonblackframes_f.is_file()
+    stat_nonblackframes = [ int(s) for s in stat_nonblackframes_f.read_text().splitlines() if s ]
+    stat_scenechanges_f = Path('stat_scenechanges.log')
+    assert stat_scenechanges_f.is_file()
+    stat_scenechanges = [ int(s) for s in stat_scenechanges_f.read_text().splitlines() if s ]
+    from pprint import pprint
+    scenes = Interval.from_list(stat_nonblackframes, min_interval=int(video_FPS*.5), split_list=stat_scenechanges )
+    print(f"Found {len(scenes)} scenes")
+
+    # Extracting frames for all scenes
+    out_file_fmt = str( filteredScreensDir / (r'{}_scene{}-{}.'+img_fmt) )
+    out_file = lambda label,sceneidx: out_file_fmt.format( label, sceneidx, '%d' )
+
+    res = [
+        [
+            'ffmpeg', 
+            '-i', str(video),
+            '-vf', f"select=between(n\,{scene.a}\,{scene.b})",
+            '-frames', str(scene.len + 1),
+            '-vsync', '0',
+            out_file( 'primary', idx )
+        ]
+        for idx,scene in enumerate(scenes)
+    ]
+    # from pprint import pformat
+    # Path('debug.log').write_text(pformat(res))
+    if not READONLY:
+        LOG.info(f"Generating frames from video ..")
+        bar = Bar('Processing scenes', max=len(res))
+        for idx,__call in enumerate(res):
+            LOG.debug( f"Processing scene {idx} ({scenes[idx].len} frames, timestamp={scenes[idx].timestamp(video_FPS)}) .." )
+            bar.next()
+            execute( __call )
+        bar.finish()
+
+        LOG.info(f"Generating frames from video OK")
+
+    # Finereader section : TODO
+    # Windows: Find `Finereader.exe`. If found, make the user choose OCR engine.
+    # `HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App\ Paths\\FineReader.exe /ve`
+
+    # OCR with Tesseract : use pytesseract
+    # check every OCR result for '<em>' : display image with sxiv and ask user "Is it italic (y/n) ? "
+    # Note : uses `xdotool` to maintain CLI active (QOL)
+
+    # subtitles = [
+    #     ( scene.timestamp(video_FPS) , OCR_scene(idx) )
+    #     for idx,scene in enumerate(scenes)
+    # ]
+    subtitles = None
+    # Caching for performance
+    subtitles_cache_file = Path('sub.tmp')
+    import pickle
+    if subtitles_cache_file.is_file():
+        with subtitles_cache_file.open("rb") as f:
+            subtitles = pickle.load( f )
+
+    if subtitles is None:
+        subtitles = [ None for _ in range(len(scenes)) ]
+        bar = Bar( message="OCR with Tesseract", max=len(scenes))
+        for idx,scene in enumerate(scenes):
+            subtitles[idx] = {
+                'scene': scene ,
+                'text' : OCR_scene(idx)
+            }
+            bar.next()
+        bar.finish()
+        LOG.info(f"OCR caching results ({subtitles_cache_file}).")
+        with subtitles_cache_file.open("wb") as f:
+            pickle.dump( subtitles, f )
+    else:
+        LOG.info(f"OCR cache hit ({subtitles_cache_file}).")
+
+
+    from pprint import pformat
+    Path('debug.sub.log').write_text(pformat(subtitles))
+
+    # De-duplicate subtitles
+    subtitles = deduplicate_subtitles( subtitles )
+    Path('debug.sub_ok.log').write_text(pformat(subtitles))
+
+
+
+    # Add Padding to subtitles
+    if sub_padding:
+        for subtitle in subtitles:
+            subtitle['scene'].add_padding(sub_padding)
+
+    
+
+    # Writing subtitles to file
+    subtitle_file = video_ori.with_suffix( '.srt' )
+    LOG.info( f"Writing subtitle file {subtitle_file} .." )
+    SRT_format = lambda idx,ts,s: f"{idx+1}\n{ts}\n{s}\n\n"
+    with subtitle_file.open("w+") as f:
+        for idx,s in enumerate(subtitles):
+            f.write( SRT_format( idx, s['scene'].timestamp_SRT(video_FPS), s['text'] ) )
+    LOG.info( f"Writing subtitle file {subtitle_file} OK" )
+
+        
+    
+    sys.exit(0)
+
+    # Post-processing : adding '\n' when necessary, dealing with empty subtitles, etc
+
+    # Alternative : OCR with FineReader :
+    # ???
+
+    # text -> ASS
+    # ASS uses INI-style sections
+    # warning: convert tags for italic/others to valid ASS tag
+    # add correction for common OCR mistakes and normalization for punctuation.
+
+
+
+
+
+
+
