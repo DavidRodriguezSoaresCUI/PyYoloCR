@@ -1,6 +1,6 @@
 # [YoloCR](https://bitbucket.org/YuriZero/yolocr/src)
 
-testmod
+
 
 ## For noobs
 Install the requirements with the Ubuntu 20.04 (Focal Fossa) installation script.
