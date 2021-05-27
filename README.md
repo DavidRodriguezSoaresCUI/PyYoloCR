@@ -76,7 +76,7 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 	* De-duplicate : some lines may be duplicated with slight variations. Simply join them and correct the text.
 	* Re-time : Some lines may not begin/end at the right timestamp. Lines with unusually high CPS (character per second) should be considered suspicious.
 
-## Help for determining the parameters for the `YoloAIO.vpy` file
+## Determining the parameters for the `YoloAIO.vpy` file
 0. Open `YoloAIO.vpy` in Vapoursynth Editor and set value `VideoSrc` to the path of the video file from which you want to extract subtitles.
 1. 'Resize' step : Set `Step` to 1 and adjust these values:
 	* `DimensionCropbox` determines the width/height of the bounding box.
@@ -91,8 +91,9 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 3. 'OCR' step : Set `Step` to 3 and verify that previously set values capture all the subtitles and minimize artifacts
 	* Typically you will play with `SeuilO` and `SeuilI` to maximise subtitle clarity and minimize artifacts.
 
+__Note__ : For more help, check these resources : [original YoloCR's README](https://bitbucket.org/YuriZero/yolocr/src/master/), [Subbing tutorial by __subarashii-no-fansub__](https://subarashii-no-fansub.github.io/Subbing-Tutorial/OCR-Hardsub-Videos/)
 
-## Adding new languages / languages that work for legacy engine
+## Tesseract: Adding new languages / languages that work with legacy engine
 The idea is to download a language file from the [Tesseract-OCR/tessdata](https://github.com/tesseract-ocr/tesseract/tree/master/tessdata) repository and put it into the local `tessdata` folder. Choose the method you prefer:
 * On Windows, simply use the `0.TesseractDownloadLanguage.bat` script : you type the language code (eg: 'eng' for english) and it downloads it for you.
 * On Linux, type the following command from the `PyYoloCR` folder : `wget https://github.com/tesseract-ocr/tessdata/blob/master/<lang-code>.traineddata?raw=true -O tessdata/<lang-code>.traineddata` (replace `<lang-code>` by the actual language code).
@@ -117,6 +118,8 @@ Please tell me if you find one !
 	3. Copy the content of `VapourSynth_plugins` the `plugins` folder of `VapourSynth` (eg: `C:\Program Files\VapourSynth\plugins`)
 	* You may need to restart your computer.
 	4. Check if `VapourSynth Editor` can preview `YoloAIO.vpy` without error now.
+
+* `VapourSynth: Failed to initialize VapourSynth environment` : see [VapourSynth's documentation](http://www.vapoursynth.com/doc/installation.html)
 
 
 # Possible improvements
