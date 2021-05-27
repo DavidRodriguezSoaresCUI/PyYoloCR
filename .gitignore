@@ -1,0 +1,7 @@
+*.log
+tessdata
+tessdata/
+tessdata/*
+*.traineddata
+*.png
+img

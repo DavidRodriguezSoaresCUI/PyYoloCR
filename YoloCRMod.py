@@ -43,6 +43,7 @@ def __input( msg: str ) -> str:
         print("\nKEYBOARDINTERRUPT")
         sys.exit(1)
 
+
 def choose( choices: List[str], msg: str = 'Choice' ) -> str:
     while True:
         print(f"Choices : ")
@@ -197,7 +198,7 @@ class Interval:
             if tentative_split is None:
                 continue
             # successful split : replace `interval_to_split` with intervals in `tentative_split` in `intervals`
-            LOG.info(f"Split interval : {repr(interval_to_split)} -> {repr(tentative_split[0])} + {repr(tentative_split[1])}")
+            LOG.debug(f"Split interval : {repr(interval_to_split)} -> {repr(tentative_split[0])} + {repr(tentative_split[1])}")
             split_list_useful = True
             intervals.discard( interval_to_split )
             intervals.add( tentative_split[0] )
@@ -297,11 +298,10 @@ def guess_text( ocr_data ):
 
 
 def OCR_scene( scene_id: int, lang: str ) -> str:
-    ocr_data = [ 
+    return [ 
         OCR_Tesseract( img, lang ) 
         for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
     ]
-    return guess_text( ocr_data )
 
 
 def deduplicate_subtitles( subtitles ):
@@ -342,7 +342,6 @@ def deduplicate_subtitles( subtitles ):
 if __name__=='__main__':
 
     img_fmt = 'jpg'
-    READONLY = True
     sub_padding = 16 # Padding for subtitles, in frames
 
     # Require Python >=3.6
@@ -357,19 +356,41 @@ if __name__=='__main__':
     import sys,re
 
     import logging
-    logging.basicConfig( level=logging.DEBUG )
+    logging.basicConfig( level=logging.INFO )
     LOG = logging.getLogger( "YoloCR" )
+    
+    from pprint import pformat
 
     # Retrieve tesseract langs
     local_tessdata = Path('./tessdata')
-    Tesseract_CFG = f"--tessdata-dir {local_tessdata.resolve()}" if local_tessdata.is_dir() else ""
+    Tesseract_mode_CFG = {
+        'Use legacy engine': {
+            'cfg': f"--tessdata-dir \"{local_tessdata.resolve()}\" --oem 0 --psm 6",
+            'info_msg': f"Using language OCR trained set from {local_tessdata.resolve()}",
+            'tag': 'legacy'
+        },
+        'Use default (typically Neural nets LSTM engine)': {
+            'cfg': "--psm 6",
+            'info_msg': "Using Tesseract built-in language OCR trained set",
+            'tag': 'LSTM'
+        }
+    }
+    k = 'Use default (typically Neural nets LSTM engine)'
+    if local_tessdata.is_dir():
+        # Ask user for Tesseract mode
+        k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
+    Tesseract_CFG = Tesseract_mode_CFG[k]['cfg']
+    LOG.info( Tesseract_mode_CFG[k]['info_msg'] )
+    print()
+    
+    # Ask user for language
     T_lang = pytesseract.get_languages(config=Tesseract_CFG)
+    assert T_lang and len(T_lang)>0
     lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
-    LOG.info(f"Selected video file {lang}")
+    LOG.info(f"Selected language : {lang}")
+    print()
 
-    # # # Make sure arg1 is the filtered video file
-    # video = select_file( "deo file Video file" )
-    video_ori = Path('Neko Vampire Elli (sub).mp4').resolve()
+    # filtered video file
     video = Path('Filtered_video.mp4').resolve()
     LOG.info(f"Selected video file : {video}\n")
 
@@ -381,15 +402,21 @@ if __name__=='__main__':
             
 
     # `FilteredScreens` : if exist, remove all `img_fmt` files, else mkdir.
+    generate_screens = True
     LOG.info("Preparing folder for screens ..")
     filteredScreensDir = Path('FilteredScreens').resolve()
     if filteredScreensDir.is_dir():
         LOG.info(f"Found {filteredScreensDir}")
         files2remove = list(filteredScreensDir.glob(f'*.{img_fmt}'))
-        if files2remove and not READONLY:
-            LOG.info(f"Removing {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ..")
-            for f in files2remove:
-                f.unlink()
+        if files2remove:
+            try:
+                input(f"Remove the {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ? Press ENTER to remove, Ctrl+C to keep.")
+                LOG.info(f"Removing {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ..")
+                for f in files2remove:
+                    f.unlink()
+            except KeyboardInterrupt:
+                generate_screens = False
+            
     else:
         LOG.info(f"Created {filteredScreensDir}")
         filteredScreensDir.mkdir()
@@ -479,7 +506,7 @@ if __name__=='__main__':
     ]
     # from pprint import pformat
     # Path('debug.log').write_text(pformat(res))
-    if not READONLY:
+    if generate_screens:
         LOG.info(f"Generating frames from video ..")
         bar = Bar('Processing scenes', max=len(res))
         for idx,__call in enumerate(res):
@@ -502,6 +529,8 @@ if __name__=='__main__':
     #     ( scene.timestamp(video_FPS) , OCR_scene(idx) )
     #     for idx,scene in enumerate(scenes)
     # ]
+
+    print()
     subtitles = None
     # Caching for performance
     subtitles_cache_file = Path('sub.tmp')
@@ -526,14 +555,18 @@ if __name__=='__main__':
     else:
         LOG.info(f"OCR cache hit ({subtitles_cache_file}).")
 
-
-    from pprint import pformat
-    Path('debug.sub.log').write_text(pformat(subtitles))
+    Path('debug.ocr_data.log').write_text(pformat(subtitles), encoding='utf8')
+    
+    # guess scene text from OCR'ed frame text
+    for __s in subtitles:
+        __s['text'] = guess_text( __s['text'] )
+        
+    
+    Path('debug.subtitles.log').write_text(pformat(subtitles), encoding='utf8')
 
     # De-duplicate subtitles
     subtitles = deduplicate_subtitles( subtitles )
-    Path('debug.sub_ok.log').write_text(pformat(subtitles))
-
+    Path('debug.sub_ok.log').write_text(pformat(subtitles), encoding='utf8')
 
 
     # Add Padding to subtitles
@@ -544,10 +577,10 @@ if __name__=='__main__':
     
 
     # Writing subtitles to file
-    subtitle_file = video_ori.with_suffix( '.srt' )
-    LOG.info( f"Writing subtitle file {subtitle_file} .." )
+    subtitle_file = Path( f"output.{Tesseract_mode_CFG[k]['tag']}.{lang}.srt" )
+    LOG.info( f"\nWriting subtitle file {subtitle_file} .." )
     SRT_format = lambda idx,ts,s: f"{idx+1}\n{ts}\n{s}\n\n"
-    with subtitle_file.open("w+") as f:
+    with subtitle_file.open("w+",encoding='utf8') as f:
         for idx,s in enumerate(subtitles):
             f.write( SRT_format( idx, s['scene'].timestamp_SRT(video_FPS), s['text'] ) )
     LOG.info( f"Writing subtitle file {subtitle_file} OK" )

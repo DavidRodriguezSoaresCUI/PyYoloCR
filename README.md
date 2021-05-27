@@ -20,11 +20,9 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 		* [fmtconv](http://forum.doom9.org/showthread.php?t=166504)
 		* *optional*: [edi_rpow2](http://forum.doom9.org/showthread.php?t=172652), requires [znedi3](https://github.com/sekrit-twc/znedi3)
 		* *very optional*: [Waifu2x-w2xc](http://forum.doom9.org/showthread.php?t=172390)
-	* note:
-		* Vapoursynth plugins (.so on Unix, .dll on Windows) should be placed inside one of theses directories: http://www.vapoursynth.com/doc/autoloading.html
-		* Vapoursynth scripts (.py) should be placed inside the "site-packages" directory of your Python3 installation.
+	* _Note for manual installs_: `Vapoursynth` plugins (.so on Unix, .dll on Windows) should be placed inside one of theses directories: http://www.vapoursynth.com/doc/autoloading.html and `Vapoursynth` python scripts (.py) should be placed inside the "site-packages" directory of your Python3 installation.
 * [Vapoursynth Editor](https://bitbucket.org/mystery_keeper/vapoursynth-editor)
-* OCR tool : for now only [Tesseract](https://github.com/tesseract-ocr/tesseract) is supported. Windows users can find binaries [here](https://github.com/UB-Mannheim/tesseract/wiki).
+* OCR tool : for now only [Tesseract](https://github.com/tesseract-ocr/tesseract) is supported.
 
 ### Unix/Linux Requirements
 
@@ -41,16 +39,30 @@ __Note__ : For Ubuntu 20.04, all the requirements can be installed with the Yolo
 > For Ubuntu, *vapoursynth*, *vapoursynth-editor* and  *vapoursynth-extra-plugins* (to install all the mandatory plugins above) are available through this ppa: [`ppa:djcj/vapoursynth`](https://launchpad.net/~djcj/+archive/ubuntu/vapoursynth)
 
 ### Windows Requirements
+It is recommended to install the following dependencies in the given order.
+
  * FFmpeg : Download "ffmpeg-git-full.7z" from [this page](https://www.gyan.dev/ffmpeg/builds/) and follow [this tutorial](https://www.thewindowsclub.com/how-to-install-ffmpeg-on-windows-10) for installation instructions.
+	* Successful installation can be verified by opening a terminal, typing `ffmpeg` and confirming ffmpeg ouputs text. 
  
- * Vapoursynth : Follow [these instructions](http://www.vapoursynth.com/doc/installation.html), which includes installing a recent version of `Python`.
-	* When installing `Python`, make sure to check the `Install for all users` and `Add to PATH` boxes, and restart your computer for changes to take effect.
+ * Vapoursynth : Follow [these instructions](http://www.vapoursynth.com/doc/installation.html), which includes installing a recent version of `Python` beforehand. Do not choose the portable version.
+	* It is recommended to install it for all users. To be able to do that, when installing `Python`, make sure to choose `Customize installation`, then check the `Install for all users` and `Add to PATH`/`Add Python to environment variables` boxes. Otherwise `VapourSynth` will not be able to be installed for all users since it depends on `Python`.
+	* A `Microsoft Defender SmartScreen` message box may appear when trying to launch the VapourSynth installer. Ignore this by clicking on `Complementary information`, then `Execute anyway`.
 
  * Vapoursynth Editor : You can find the latest portable binaries from [its official download page](https://bitbucket.org/mystery_keeper/vapoursynth-editor/downloads/). No install needed, just decompress it !
+	* For ease of use, it is recommended to make a desktop shortcut by right-clicking on `vsedit.exe` and selecting `send to -> Desktop (add shortcut)`.
 
  * Tesseract : You can find installers [here](https://github.com/UB-Mannheim/tesseract/wiki).
+	* Support for OCR languages can be added at installation or later (see section `Adding OCR language support`)
+
+	* You need to add `C:\Program Files\Tesseract-OCR` to your system PATH environment variable in order to call `Tesseract` from the command line.
+
+__Note__ : There is a helper script that automates the installation of required `VapourSynth` filters/plugins and `Python` libraries. It must be launched with admin privileges __AFTER ALL__ previous dependencies are properly installed or it may fail.
+> __Warning__ : You need to have associated `.py` files with `Python` on your machine before running this script or it will fail installing plugins ! Simply right-click a file ending in `.py` -> Properties -> Open with -> Python (check "always use" checkbox if present)
 
 ## How to use?
+
+### Generating VPY files
+Simply launch the `0.MakeVPY` script and 
 
 ### Help for determining the parameters for the `YoloCR.vpy` file
 
@@ -121,11 +133,9 @@ Then you can OCR the video: `./YoloCR.sh nameOftheVideoOutput.mp4`
 
 ## Known bugs
 
-* Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
+* [_Written by `YuriZero`, I did not check if this is an issue_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
 	* Use Legacy engine [traineddata](https://github.com/tesseract-ocr/tessdata) instead.
-	* You can put these files inside YoloCR's tessdata directory.
-* Cygwin (Windows), when you run YoloCR.sh for the first time.
-	* Signal SIGCHLD received, but no signal handler set.
-	* YoloCR will run without errors the next times.
-* Babun (Windows), you will have errors when trying to run YoloCR.sh.
-	* Use Cygwin instead.
+	* You can put these files inside YoloCR's `./tessdata` directory.
+
+## TODO and possible improvements
+ * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific) and viable alternative to `Tesseract`.
