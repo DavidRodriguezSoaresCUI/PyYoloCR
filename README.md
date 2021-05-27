@@ -61,6 +61,7 @@ __Note__ : There is a helper script (`0.WinAutoInstall.bat`) that automates the 
 > __Warning__ : You need to have associated `.py` files with `Python` on your machine before running this script or it will fail installing plugins ! Simply right-click a file ending in `.py` -> Properties -> Open with -> Python (check "always use" checkbox if present)
 
 Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PATH%20example.png)
+<img src"https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PATH%20example.png">
 
 # How to use?
 
