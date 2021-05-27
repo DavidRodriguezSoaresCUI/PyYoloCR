@@ -47,6 +47,7 @@ It is recommended to install the following dependencies in the given order.
  
  * Vapoursynth : Follow [these instructions](http://www.vapoursynth.com/doc/installation.html), which includes installing a recent version of `Python` beforehand. Do not choose the portable version.
 	* It is recommended to install it for all users. To be able to do that, when installing `Python`, make sure to choose `Customize installation`, then check the `Install for all users` and `Add to PATH`/`Add Python to environment variables` boxes. Otherwise `VapourSynth` will not be able to be installed for all users since it depends on `Python`.
+	![Image](https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PyInstall.png)
 	* A `Microsoft Defender SmartScreen` message box may appear when trying to launch the VapourSynth installer. Ignore this by clicking on `Complementary information`, then `Execute anyway`.
 
  * Vapoursynth Editor : You can find the latest portable binaries from [its official download page](https://bitbucket.org/mystery_keeper/vapoursynth-editor/downloads/). No install needed, just decompress it !
@@ -61,7 +62,6 @@ __Note__ : There is a helper script (`0.WinAutoInstall.bat`) that automates the 
 > __Warning__ : You need to have associated `.py` files with `Python` on your machine before running this script or it will fail installing plugins ! Simply right-click a file ending in `.py` -> Properties -> Open with -> Python (check "always use" checkbox if present)
 
 Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PATH%20example.png)
-<img src"https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PATH%20example.png">
 
 # How to use?
 
