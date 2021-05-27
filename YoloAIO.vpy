@@ -7,8 +7,8 @@ DimensionCropBox=[0.9,0.2] # in [0,1]; Width, Height of box for subtitles
 HauteurCropBox=0.0 # in [0,1-DimensionCropBox[1]]; How "high" (far from the bottom) should the text box be
 # Step 2 : adjusting threshold for text extraction (L monochrome or RGB color mode)
 ModeS='L' # 'L' for Luma, 'R' pour Red, 'B' pour Blue ou 'G' pour Green. Seuil à analyser.
-SeuilI=170 # typically in [170,230]; Seuil délimitant les sous-titres. Cette valeur correspond à la luminosité minimale de l'intérieur (Inline).
-SeuilO=50 # typically in [20,120]; Seuil délimitant les sous-titres. Cette valeur correspond à la luminosité maximale de l'extérieur (Outline).
+SeuilI=200 # typically in [170,230]; Seuil délimitant les sous-titres. Cette valeur correspond à la luminosité minimale de l'intérieur (Inline).
+SeuilO=70 # typically in [20,120]; Seuil délimitant les sous-titres. Cette valeur correspond à la luminosité maximale de l'extérieur (Outline).
 # Step 3 : See output to check previously set values are good (subtitles are readable and there are not too many artifacts)
 
 # Other variables
@@ -21,7 +21,10 @@ import vapoursynth as vs
 if ModeU=='znedi3':
 	import edi_rpow2 as edi
 core=vs.get_core()
-Clip=core.ffms2.Source(source=VideoSrc)
+try:
+	Clip=core.ffms2.Source(source=VideoSrc)
+except AttributeError as e:
+	raise AttributeError(f"The following error was raised : '{e}'\nYou may have forgotten/failed to install PyYoloCR required VapourSynth plugins !")
 
 def makeMOD2( x: int ) -> int:
     # ensures x is even (mod 2)

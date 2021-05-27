@@ -38,10 +38,10 @@ def main():
     system_path_f = Path('./PATH.log')
     assert system_path_f.is_file()
     system_path = system_path_f.read_text().split(';')
-    python_path = sys.path
+    python_path = [ Path(p) for p in sys.path ]
 
     # Finding 'all users' python 'site-packages' location
-    python_site_packages = list( filter( lambda s: ('Program Files' in s and 'site-packages' in s), python_path ) )
+    python_site_packages = list( filter( lambda s: ('Program Files' in s.parts and 'site-packages'==s.parts[-1]), python_path ) )
     assert python_site_packages and len(python_site_packages)==1, f"ERROR: could not identify 'site-packages' location with python_path={python_path}"
     python_site_packages = python_site_packages[0]
 

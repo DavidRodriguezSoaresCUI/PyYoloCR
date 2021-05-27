@@ -2,6 +2,41 @@
 
 from typing import List, Union, Set
 from pathlib import Path
+import multiprocessing as mp
+import pytesseract
+import re
+
+def OCR_Tesseract( arg ) -> dict:
+    img, lang, Tesseract_CFG = arg
+    tmp = {
+        k:v[4:]
+        for k,v in pytesseract.image_to_data( 
+            str(img),
+            lang=lang,
+            config=Tesseract_CFG,
+            output_type=pytesseract.Output.DICT
+        ).items()
+        if k=='conf' or k=='text'
+    }
+    _len_txt = len(tmp['text'])
+    assert len(tmp['conf']) == _len_txt
+    tmp['len'] = _len_txt
+    return tmp
+
+def OCR_scene( scene_id: int, lang: str ) -> str:
+    f = OCR_Tesseract
+    args = [
+        ( img, lang, Tesseract_CFG )
+        for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
+    ]
+    _thr = int(_getThreads()/2)
+    pool = mp.Pool(processes=_thr)
+    return pool.map( f, args )
+
+    # return [ 
+    #     OCR_Tesseract( img, lang ) 
+    #     for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
+    # ]
 
 def execute( call: Union[str,List[str]] ) -> dict():
     from subprocess import Popen, STDOUT, PIPE
@@ -256,7 +291,7 @@ class Interval:
         self.a -= padding
         self.b += padding
 
-        
+''' DEPRECATED        
 def OCR_Tesseract( img: Path, lang: str ) -> dict:
     from pytesseract import Output
     tmp = {
@@ -273,6 +308,14 @@ def OCR_Tesseract( img: Path, lang: str ) -> dict:
     assert len(tmp['conf']) == _len_txt
     tmp['len'] = _len_txt
     return tmp
+
+
+def OCR_scene( scene_id: int, lang: str ) -> str:
+    return [ 
+        OCR_Tesseract( img, lang ) 
+        for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
+    ]
+'''
 
 def guess_text( ocr_data ):
     # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
@@ -297,11 +340,16 @@ def guess_text( ocr_data ):
     return guess
 
 
-def OCR_scene( scene_id: int, lang: str ) -> str:
-    return [ 
-        OCR_Tesseract( img, lang ) 
-        for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
-    ]
+def _getThreads():
+    # from https://oxavelar.wordpress.com/2011/03/09/how-to-get-the-number-of-available-threads-in-python/
+    """ Returns the number of available threads on a posix/win based system """
+    import os,sys
+    if sys.platform == 'win32':
+        return (int)(os.environ['NUMBER_OF_PROCESSORS'])
+    else:
+        return (int)(os.popen('grep -c cores /proc/cpuinfo').read())
+
+
 
 
 def deduplicate_subtitles( subtitles ):
@@ -336,13 +384,30 @@ def deduplicate_subtitles( subtitles ):
     return subtitles_ok
     
 
+def subtitle_normaization( txt: str, lang: str ) -> str:
+    res = txt
+
+    # Duplicated whitespace
+    res = re.sub( r'\s{2,}', ' ', res )
+    # Double/simple quote normalization
+    res = re.sub( r'”', '"', res )
+    res = re.sub( r'‘', '\'', res )
+
+    if lang=='eng':
+        # Malformed 'I' capitalization
+        res = res.replace('|', 'I')
+        res = re.sub(r'^l','I', res)
+
+    return res
 
 
 
 if __name__=='__main__':
 
+    mp.freeze_support()
+
     img_fmt = 'jpg'
-    sub_padding = 16 # Padding for subtitles, in frames
+    sub_padding = 0 # Padding for subtitles, in frames
 
     # Require Python >=3.6
     ensure_min_python( [3,6] )
@@ -561,6 +626,10 @@ if __name__=='__main__':
     for __s in subtitles:
         __s['text'] = guess_text( __s['text'] )
         
+    
+    # Applying corrections
+    for subtitle in subtitles:
+        subtitle['text'] = subtitle_normaization( subtitle['text'], lang )        
     
     Path('debug.subtitles.log').write_text(pformat(subtitles), encoding='utf8')
 

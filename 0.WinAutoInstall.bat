@@ -13,11 +13,22 @@ echo:
 echo This script tries to install VapourSynth plugins and python libraries needed for PyYoloCR.
 
 
+@REM choose Python interpreter
+Set "PythonInterpreter=python"
+IF EXIST Python.txt (
+  Set /P PythonInterpreter=<Python.txt
+  @REM Because the Windows command line doesn't immediately affect 'PythonInterpreter' and we need quotes, it is done in another code block below 
+)
+IF EXIST Python.txt (
+  Set PythonInterpreter="%PythonInterpreter%"
+)
+
+
 @REM Launch script
 echo:
 echo [1/3] Installing VapourSynth plugins ..
 echo %PATH% >PATH.log
-python 0.WinAutoInstall.py
+%PythonInterpreter% 0.WinAutoInstall.py
 del PATH.log
 @REM Unfortunately, passing %PATH% as argument didn't always worked, so as alternative it is written to a temporary file. 
 
@@ -25,13 +36,13 @@ del PATH.log
 @REM Updating pip (not mandatory, just a nice to have)
 echo:
 echo [2/3] Updating pip ..
-python -m pip install --upgrade pip
+%PythonInterpreter% -m pip install --upgrade pip
 
 
 @REM Installing Python libraries from requirements file
 echo:
 echo [3/3] Installing python libraries ..
-python -m pip install -r requirements
+%PythonInterpreter% -m pip install -r requirements
 
 
 @REM END OF SCRIPT

@@ -40,6 +40,8 @@ __Note__ : For Ubuntu 20.04, all the requirements (and more because I'm lazy and
 ## Windows Requirements / Install
 It is recommended to install the following dependencies in the given order.
 
+[Here is a repository with all binaries/installers for 64-bit Windows in case you can't find something elsewhere.](https://gitlab.com/DRSCUI/pyyolocr-extra/-/tree/main/PyYoloCR_Win64_dependencies)
+
  * FFmpeg : Download "ffmpeg-git-full.7z" from [this page](https://www.gyan.dev/ffmpeg/builds/) and follow [this tutorial](https://www.thewindowsclub.com/how-to-install-ffmpeg-on-windows-10) for installation instructions.
 	* Successful installation can be verified by opening a terminal, typing `ffmpeg` and confirming ffmpeg ouputs text. 
  
@@ -67,7 +69,12 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 1. Preprocessing : Adjust parameters in `YoloAIO.vpy`, so the output is optimal for OCR.
 	* Next step needs variable `Step` to be set to 3.
 2. Generate filtered video with `1.ProduceFilteredVideo` script.
-3. Use `2.LaunchYoloCRMod` script to extract frames, OCR them and generate a subtitle file.
+3. Use `2.LaunchYoloCRMod` script to extract frames, OCR them and generate a `srt` subtitle file.
+4. Post-processing : Use your favourite tool to _manually correct errors_ with the output subtitle file (recommended: [Aegisub](https://github.com/Aegisub/Aegisub)) : 
+	* Spelling errors, malformed words, erroneous punctuation, etc
+	* Remove additional "phantom" symbols (a result of OCR'ing video artifacts)
+	* De-duplicate : some lines may be duplicated with slight variations. Simply join them and correct the text.
+	* Re-time : Some lines may not begin/end at the right timestamp. Lines with unusually high CPS (character per second) should be considered suspicious.
 
 ## Help for determining the parameters for the `YoloAIO.vpy` file
 0. Open `YoloAIO.vpy` in Vapoursynth Editor and set value `VideoSrc` to the path of the video file from which you want to extract subtitles.
@@ -97,6 +104,12 @@ Please tell me if you find one !
 * [_Written by `YuriZero` for the original `YoloCR`, in my testing I sometimes found the LSTM engine to be superior in accuracy_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
 	* Use Legacy engine [traineddata](https://github.com/tesseract-ocr/tessdata) instead.
 	* You can put these files inside YoloCR's `./tessdata` directory.
+
+* Windows : The `*.bat` scripts can fail when `*.py` files are not assigned to a `Python` interpreter (which is weird since it's called explicitely). 
+	* See __Warning__ in the `Windows Requirements / Install` section or apply the same solution as the problem below.
+
+* Windows : The `*.bat` scripts can fail when the default `Python` interpreter is not the same as the one used by `VapourSynth`. 
+	* To remedy that, create a file named `Python.txt` and put the path of the correct interpreter in it (eg: `C:\Program Files\Python39`).
 
 # Possible improvements
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
