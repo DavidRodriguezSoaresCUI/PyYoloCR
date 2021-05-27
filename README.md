@@ -27,13 +27,11 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 
 ## Unix/Linux Requirements / Install
 
-__Note__ : For Ubuntu 20.04, all the requirements can be installed with the YoloBuntuInstallation script : `sh YoloBuntuInstallation.sh`
+__Note__ : For Ubuntu 20.04, all the requirements (and more because I'm lazy and didn't remove deprecated stuff from the script) can be installed with the `YoloBuntuInstallation.sh` script.
 
 * Tesseract-OCR (version 4 recommended)
 	* and install the data corresponding to the languages you want to OCR
 	* Imagemagick is required if you use LSTM engine
-* sxiv (Simple X Image Viewer) (GUI mode only)
-* xdotool (Linux only, GUI mode only)
 
 > *Note*: most of these package, with the exception of all the plugins for vapoursynth, are available as official package for your distro.
 
@@ -96,7 +94,7 @@ The idea is to download a language file from the [Tesseract-OCR/tessdata](https:
 # Known bugs
 Please tell me if you find one !
 
-* [_Written by `YuriZero` for the original YoloCR, in my testing I sometimes found the LSTM engine to be superior in accuracy_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
+* [_Written by `YuriZero` for the original `YoloCR`, in my testing I sometimes found the LSTM engine to be superior in accuracy_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
 	* Use Legacy engine [traineddata](https://github.com/tesseract-ocr/tessdata) instead.
 	* You can put these files inside YoloCR's `./tessdata` directory.
 
@@ -104,4 +102,5 @@ Please tell me if you find one !
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
 
  * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific) and viable alternative to `Tesseract`.
- * Add _italics_ detection : originally in YoloCR and scrapped in PyYoloCR.
+ * Add _italics_ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
+ * Make the code less ugly / bad : I'm an amateur, so it's to be expected.
