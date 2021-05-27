@@ -57,7 +57,7 @@ It is recommended to install the following dependencies in the given order.
 
 	* You need to add `C:\Program Files\Tesseract-OCR` to your system PATH environment variable in order to call `Tesseract` from the command line.
 
-__Note__ : There is a helper script that automates the installation of required `VapourSynth` filters/plugins and `Python` libraries. It must be launched with admin privileges __AFTER ALL__ previous dependencies are properly installed or it may fail.
+__Note__ : There is a helper script (`0.WinAutoInstall.bat`) that automates the installation of required `VapourSynth` filters/plugins and `Python` libraries. It must be launched with admin privileges __AFTER ALL__ previous dependencies are properly installed or it may fail.
 > __Warning__ : You need to have associated `.py` files with `Python` on your machine before running this script or it will fail installing plugins ! Simply right-click a file ending in `.py` -> Properties -> Open with -> Python (check "always use" checkbox if present)
 
 # How to use?
