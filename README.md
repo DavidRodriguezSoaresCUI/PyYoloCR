@@ -86,6 +86,13 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 3. 'OCR' step : Set `Step` to 3 and verify that previously set values capture all the subtitles and minimize artifacts
 	* Typically you will play with `SeuilO` and `SeuilI` to maximise subtitle clarity and minimize artifacts.
 
+
+## Adding new languages / languages that work for legacy engine
+The idea is to download a language file from the [Tesseract-OCR/tessdata](https://github.com/tesseract-ocr/tesseract/tree/master/tessdata) repository and put it into the local `tessdata` folder. Choose the method you prefer:
+* On Windows, simply use the `0.TesseractDownloadLanguage.bat` script : you type the language code (eg: 'eng' for english) and it downloads it for you.
+* On Linux, type the following command from the `PyYoloCR` folder : `wget https://github.com/tesseract-ocr/tessdata/blob/master/<lang-code>.traineddata?raw=true -O tessdata/<lang-code>.traineddata` (replace `<lang-code>` by the actual language code).
+* Manually as described above.
+
 # Known bugs
 Please tell me if you find one !
 
