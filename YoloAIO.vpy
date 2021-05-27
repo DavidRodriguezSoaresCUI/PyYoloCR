@@ -12,6 +12,7 @@ SeuilO=50 # typically in [20,120]; Seuil délimitant les sous-titres. Cette vale
 # Step 3 : See output to check previously set values are good (subtitles are readable and there are not too many artifacts)
 
 # Other variables
+Seuil=-1 # Seuil délimitant les sous-titres. Mettre à -1 pour chercher le seuil à l'aide de VapourSynth Editor.
 SeuilSCD=0.1 # Un seuil trop bas augmente le nombre de faux positifs, un seuil trop haut ne permet pas de détecter tous les sous-titres.
 ModeU='sinc' # 'sinc' (2 taps, plus rapide), 'znedi3' (plus lent) ou 'waifu2x' (beaucoup plus lent), contrôle la méthode d'Upscale.
 
@@ -110,8 +111,7 @@ if Step==1:
     Clip.set_output()
 
 elif Step==2:
-    Supersampling=-1 # Facteur de supersampling (multiplication de la résolution de la vidéo). Mettre à -1 pour calculer le facteur automatiquement.
-    Seuil=-1 # Seuil délimitant les sous-titres. Mettre à -1 pour chercher le seuil à l'aide de VapourSynth Editor.
+    Supersampling=-1 # Facteur de supersampling (multiplication de la résolution de la vidéo). Mettre à -1 pour calculer le facteur automatiquement.    
 
     Clip=core.std.CropAbs(clip=Clip,width=DimensionCropBox[0],height=DimensionCropBox[1],left=LeftCropBox,top=Clip.height-HauteurCropBox-DimensionCropBox[1])
 

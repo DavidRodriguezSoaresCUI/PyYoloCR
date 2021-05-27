@@ -1,7 +1,7 @@
 # [PyYoloCR](https://gitlab.com/DRSCUI/pyyolocr)
 
 ## About PyYoloCR
-This is a Bash $\to$ Python 3.6+ re-implementation of the original [YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user YuriZero (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9))
+This is a Bash -> Python 3.6+ re-implementation of the [original YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user `YuriZero` (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9))
 
 ### Why go through the trouble of re-implementing working software ?
 I needed an easy, low effort and automated way to extract hardcoded subtitles (subtitles in the video stream, not in a dedicated subtitle stream). There are multiple open-source projects that share the same user need and I tried some with little success, so I chose __YoloCR__ as a base and modded it.
@@ -9,8 +9,9 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 ### Key improvements
  * __OCR performance__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_.
  * __Maintainability__ : While the original `bash` code is functional and compact, it's arguably harder to maintain than a program written in a high-level language
+ * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependences means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
 
-## Requirements
+# Requirements
 
 * [FFmpeg](https://ffmpeg.org/) : should be callable from the command line
 * Vapoursynth R36+
@@ -24,7 +25,7 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 * [Vapoursynth Editor](https://bitbucket.org/mystery_keeper/vapoursynth-editor)
 * OCR tool : for now only [Tesseract](https://github.com/tesseract-ocr/tesseract) is supported.
 
-### Unix/Linux Requirements
+## Unix/Linux Requirements / Install
 
 __Note__ : For Ubuntu 20.04, all the requirements can be installed with the YoloBuntuInstallation script : `sh YoloBuntuInstallation.sh`
 
@@ -38,7 +39,7 @@ __Note__ : For Ubuntu 20.04, all the requirements can be installed with the Yolo
 
 > For Ubuntu, *vapoursynth*, *vapoursynth-editor* and  *vapoursynth-extra-plugins* (to install all the mandatory plugins above) are available through this ppa: [`ppa:djcj/vapoursynth`](https://launchpad.net/~djcj/+archive/ubuntu/vapoursynth)
 
-### Windows Requirements
+## Windows Requirements / Install
 It is recommended to install the following dependencies in the given order.
 
  * FFmpeg : Download "ffmpeg-git-full.7z" from [this page](https://www.gyan.dev/ffmpeg/builds/) and follow [this tutorial](https://www.thewindowsclub.com/how-to-install-ffmpeg-on-windows-10) for installation instructions.
@@ -59,83 +60,38 @@ It is recommended to install the following dependencies in the given order.
 __Note__ : There is a helper script that automates the installation of required `VapourSynth` filters/plugins and `Python` libraries. It must be launched with admin privileges __AFTER ALL__ previous dependencies are properly installed or it may fail.
 > __Warning__ : You need to have associated `.py` files with `Python` on your machine before running this script or it will fail installing plugins ! Simply right-click a file ending in `.py` -> Properties -> Open with -> Python (check "always use" checkbox if present)
 
-## How to use?
+# How to use?
 
-### Generating VPY files
-Simply launch the `0.MakeVPY` script and 
+## Basics
+1. Preprocessing : Adjust parameters in `YoloAIO.vpy`, so the output is optimal for OCR.
+	* Next step needs variable `Step` to be set to 3.
+2. Generate filtered video with `1.ProduceFilteredVideo` script.
+3. Use `2.LaunchYoloCRMod` script to extract frames, OCR them and generate a subtitle file.
 
-### Help for determining the parameters for the `YoloCR.vpy` file
+## Help for determining the parameters for the `YoloAIO.vpy` file
+0. Open `YoloAIO.vpy` in Vapoursynth Editor and set value `VideoSrc` to the path of the video file from which you want to extract subtitles.
+1. 'Resize' step : Set `Step` to 1 and adjust these values:
+	* `DimensionCropbox` determines the width/height of the bounding box.
+	* `HauteurCropBox` determines the vertical position of the bounding box.
+	* In this step, you are to choose values such that any subtitles are within the bounding box.
+2. 'Threshold' step : Set `Step` to 2 and adjust these values:
+	* Choose the fitting `ModeS` : 'L' if you want to define a white or black threshold, succesively 'R', 'G' and 'B' otherwise.
+	* `SeuilI` : the inline threshold value (decrease it if it improves the clarity of the letters)
+	* `SeuilO` : the outline threshold value (increase it if some letters got erased)
+	* Note : `SeuilO` < `SeuilI`
+	* Adjust the Threshold with the help of the "Color Panel" found in the **F5** window.
+3. 'OCR' step : Set `Step` to 3 and verify that previously set values capture all the subtitles and minimize artifacts
+	* Typically you will play with `SeuilO` and `SeuilI` to maximise subtitle clarity and minimize artifacts.
 
-#### Determine the Resize parameters.
+# Known bugs
+Please tell me if you find one !
 
-Resize is very helpful to locate the subtitles.
-
-1. open `YoloResize.vpy` in Vapoursynth Editor.
-2. Change this value:
-	* `FichierSource` is the path of the video to OCR.
-	* `DimensionCropbox` allows you to limit the OCR zone.
-	* `HauteurCropBox` allows you to define the height of the Cropbox's bottom border.
-
-> Note that theses two parameters have to be adjusted before upscale.
-
-You can then change `Supersampling` parameter to -1 and verify that your subtitles aren't eated by the white borderline by using **F5**.
-
-#### Determine the threshold of the subtitles
-
-It's to improve the OCR-process and the subtitles detection.
-
-1. Open `YoloSeuil.vpy` in Vapoursynth editor.
-2. Report `FichierSource`, `DimensionCropBox` and `HauteurCropBox` you have defined in the `Resize` file.
-3. Choose the fitting ModeS. 'L' if you want to define a white or black threshold, succesively 'R', 'G' and 'B' otherwise.
-4. Adjust the Threshold with the help of the "Color Panel" found in the **F5** window.
-
-You must to do this two times if you are using ModeS=L:
-
-* in the first case, the Inline threshold will be the minimum.
-* in the second case, the Outline threshold will be the maximum.
-
-You can then change `Seuil` paremeter to the values previously found.
-
-* in the first case, the subtitles must remain completely visible. The highest the value, the better.
-* in the second case, the Outline must remain completely black. The lowest the value, the better.
-
-### Filter the video
-
-1. Edit the first lines in `YoloCR.vpy` thanks to the two previos steps (and the previous file `YoloSeuil.vpy`).
-	* SeuilI = the inline threshold value (decrease it if it improves the clarity of the letters)
-	* SeuilO = the outline threshold value (increase it if some letters got erased)
- 
-2. Then filter it: `vspipe -y YoloCR.vpy - | ffmpeg -i - -c:v mpeg4 -qscale:v 3 -y nameOftheVideoOutput.mp4`
-
-> Be careful: your must use a different name for your `FichierSource` in the previous files and `nameOftheVideoOutput.mp4` for the output of the ffmpeg command.
-
-You now have an OCR-isable video and scenechange informations.
-
-### OCR the video
-
-Then you can OCR the video: `./YoloCR.sh nameOftheVideoOutput.mp4`
-
-> The `nameOftheVideoOutput.mp4` must be the same than the output of the ffmpeg command.
-
-> You can use `YoloTime.sh` instead of `YoloCR.sh` if you only want the Timing of the subtitles.
-
-**Now it's Checking time :D**
-
-## Serial use of YoloCR
-
-1. Make sure that sxiv isn't installed.
-2. Make sure that YoloCR directory includes the video files you want to OCR and only theses.
-3. Comment the first line of YoloCR.vpy. ("FichierSource" becomes "#FichierSource".)
-4. Move to the YoloCR directory and use this bash command:
-	* `for file in *.mp4; do filef="${file%.*}_filtered.mp4"; vspipe -y --arg FichierSource="$file" YoloCR.vpy - | ffmpeg -i - -c:v mpeg4 -qscale:v 3 -y "$filef"; ./YoloCR.sh "$filef"; done`
-
-> "*.mp4" means that all files having the mp4 extension will be processed. Read about bash regex if you want more flexibility.
-
-## Known bugs
-
-* [_Written by `YuriZero`, I did not check if this is an issue_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
+* [_Written by `YuriZero` for the original YoloCR, in my testing I sometimes found the LSTM engine to be superior in accuracy_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
 	* Use Legacy engine [traineddata](https://github.com/tesseract-ocr/tessdata) instead.
 	* You can put these files inside YoloCR's `./tessdata` directory.
 
-## TODO and possible improvements
+# Possible improvements
+I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
+
  * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific) and viable alternative to `Tesseract`.
+ * Add _italics_ detection : originally in YoloCR and scrapped in PyYoloCR.
