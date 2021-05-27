@@ -111,6 +111,14 @@ Please tell me if you find one !
 * Windows : The `*.bat` scripts can fail when the default `Python` interpreter is not the same as the one used by `VapourSynth`. 
 	* To remedy that, create a file named `Python.txt` and put the path of the correct interpreter in it (eg: `C:\Program Files\Python39`).
 
+* Windows : For some reason `vsrepo` may encounter issues and make `VapourSynth plugin` installation impossible through the provided `0.WinAutoInstall.bat` script. The following may work :
+	1. [Download the compiled plugins from PyYoloCR-extra](https://gitlab.com/DRSCUI/pyyolocr-extra/-/tree/main/PyYoloCR_Win64_dependencies) and unzip it.
+	2. Copy the content of `python_site-packages` the `Python` interpreter `VapourSynth` uses `site-packages` folder (eg: `C:\Program Files\Python39\Lib\site-packages`) 
+	3. Copy the content of `VapourSynth_plugins` the `plugins` folder of `VapourSynth` (eg: `C:\Program Files\VapourSynth\plugins`)
+	* You may need to restart your computer.
+	4. Check if `VapourSynth Editor` can preview `YoloAIO.vpy` without error now.
+
+
 # Possible improvements
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
 
