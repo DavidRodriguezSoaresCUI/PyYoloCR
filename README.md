@@ -1,7 +1,7 @@
 # [SubXtract](https://gitlab.com/DRSCUI/pyyolocr)
 
 ## About SubXtract
-This software aims at offering a __simple__, __easy__ and mostly __automated__ way of __extracting hardcoded subtitles__ (burned into the video stream) in a video.
+This software aims at offering a __simple__, __easy__ and mostly __automated__ way of __extracting hardcoded subtitles__ (burned into the video stream) from a video.
 
 This is not only a Bash -> Python 3.6+ re-implementation of the [original YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user `YuriZero` (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9)), but also a major overhaul of most of the code.
 
@@ -12,7 +12,7 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 ### Key improvements
  * __OCR performance__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_.
  * __Maintainability__ : While the original `bash` code is functional and compact, it's arguably harder to maintain than a program written in a high-level language
- * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependences means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
+ * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependencies means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
 
 # Requirements
 Look below for OS-specific installation instructions.
@@ -33,6 +33,7 @@ Look below for OS-specific installation instructions.
 
 For Ubuntu 20.04, all the requirements (and more because I'm lazy and didn't remove deprecated stuff from the script) can be installed with the `YoloBuntuInstallation.sh` script.
 
+Notes:
 * Tesseract-OCR (version 4 recommended)
 	* and install the data corresponding to the languages you want to OCR
 	* Imagemagick is required if you use LSTM engine
@@ -67,7 +68,7 @@ __Note__ : There is a helper script (`0.WinAutoInstall.bat`) that automates the 
 
 Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/pyyolocr-extra/-/raw/main/img/PATH%20example.png)
 
-# How to use?
+# How to use
 
 ## Basics
 1. Preprocessing : Adjust parameters in `YoloAIO.vpy`, so the output is optimal for OCR.
@@ -81,10 +82,12 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 	* Re-time : Some lines may not begin/end at the right timestamp. Lines with unusually high CPS (character per second) should be considered suspicious.
 
 ## Determining the parameters for the `YoloAIO.vpy` file
+You can find descriptions and advice on each parameter in `YoloAIO.vpy`, but here are the basics :
+
 0. Open `YoloAIO.vpy` in Vapoursynth Editor and set value `VideoSrc` to the path of the video file from which you want to extract subtitles.
 1. 'Resize' step : Set `Step` to 1 and adjust these values:
-	* `DimensionCropbox` determines the width/height of the bounding box. Make sure it's big enough.
-	* `HauteurCropBox` determines the vertical position of the bounding box.
+	* `CropBoxDimension` determines the width/height of the bounding box. Make sure it's big enough.
+	* `CropBoxElevation` determines the vertical position of the bounding box.
 	* In this step, you are to choose values such that any subtitles are within the bounding box.
 2. 'Threshold' step : Set `Step` to 2 and adjust these values:
 	* Choose the fitting `ModeS` : 'L' if you want to define a white or black threshold, succesively 'R', 'G' and 'B' otherwise.
@@ -95,7 +98,7 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 3. 'OCR' step : Set `Step` to 3 and verify that previously set values capture all the subtitles and minimize artifacts
 	* Typically you will play with `SeuilO` and `SeuilI` to maximise subtitle clarity and minimize artifacts.
 
-__Note__ : For more help, check these resources : [original YoloCR's README](https://bitbucket.org/YuriZero/yolocr/src/master/), [Subbing tutorial by __subarashii-no-fansub__](https://subarashii-no-fansub.github.io/Subbing-Tutorial/OCR-Hardsub-Videos/)
+For more help, check these resources (may not apply directly) : [original YoloCR's README](https://bitbucket.org/YuriZero/yolocr/src/master/), [Subbing tutorial by __subarashii-no-fansub__](https://subarashii-no-fansub.github.io/Subbing-Tutorial/OCR-Hardsub-Videos/)
 
 ## Tesseract: Adding new languages / languages that work with legacy engine
 The idea is to download a language file from the [Tesseract-OCR/tessdata](https://github.com/tesseract-ocr/tesseract/tree/master/tessdata) repository and put it into the local `tessdata` folder. Choose the method you prefer:
@@ -129,11 +132,11 @@ Please tell me if you find more !
 
 
 # General remarks
-* Tesseract-OCR engines accuracy : For general, clear text, both engines perform admirably. The `legacy` engine can have more difficulties punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least find some characters.
+* Tesseract-OCR engines accuracy : For general, clear text, both engines perform admirably well. The `legacy` engine can have more difficulties on punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least finds some characters.
 
 * Storage : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
 
-* Performance : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. On a modern 8 core machine you should experience the following speed, respectively : 0.5-2x, 1-3x, 10-20x
+* Performance : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. For reference, on a modern 8 core machine you should experience the following speeds, respectively : 0.5-2x, 1-3x, 10-20x
 
 * The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
 
