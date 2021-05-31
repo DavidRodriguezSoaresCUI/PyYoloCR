@@ -1,9 +1,12 @@
-# [PyYoloCR](https://gitlab.com/DRSCUI/pyyolocr)
+# [SubXtract](https://gitlab.com/DRSCUI/pyyolocr)
 
-## About PyYoloCR
-This is a Bash -> Python 3.6+ re-implementation of the [original YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user `YuriZero` (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9))
+## About SubXtract
+This software aims at offering a __simple__, __easy__ and mostly __automated__ way of __extracting hardcoded subtitles__ (burned into the video stream) in a video.
 
-### Why go through the trouble of re-implementing working software ?
+This is not only a Bash -> Python 3.6+ re-implementation of the [original YoloCR](https://bitbucket.org/YuriZero/yolocr/src) by bitbucket user `YuriZero` (specifically at commit [7dd128c](https://bitbucket.org/YuriZero/yolocr/commits/7dd128c61a75578380572d5def65b804814e82e9)), but also a major overhaul of most of the code.
+
+
+### Why go through the trouble of re-implementing/modding working software ?
 I needed an easy, low effort and automated way to extract hardcoded subtitles (subtitles in the video stream, not in a dedicated subtitle stream). There are multiple open-source projects that share the same user need and I tried some with little success, so I chose __YoloCR__ as a base and modded it.
 
 ### Key improvements
@@ -12,6 +15,7 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
  * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependences means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
 
 # Requirements
+Look below for OS-specific installation instructions.
 
 * [FFmpeg](https://ffmpeg.org/) : should be callable from the command line
 * Vapoursynth R36+
@@ -27,7 +31,7 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 
 ## Unix/Linux Requirements / Install
 
-__Note__ : For Ubuntu 20.04, all the requirements (and more because I'm lazy and didn't remove deprecated stuff from the script) can be installed with the `YoloBuntuInstallation.sh` script.
+For Ubuntu 20.04, all the requirements (and more because I'm lazy and didn't remove deprecated stuff from the script) can be installed with the `YoloBuntuInstallation.sh` script.
 
 * Tesseract-OCR (version 4 recommended)
 	* and install the data corresponding to the languages you want to OCR
@@ -79,7 +83,7 @@ Your PATH should look something like that : ![Image](https://gitlab.com/DRSCUI/p
 ## Determining the parameters for the `YoloAIO.vpy` file
 0. Open `YoloAIO.vpy` in Vapoursynth Editor and set value `VideoSrc` to the path of the video file from which you want to extract subtitles.
 1. 'Resize' step : Set `Step` to 1 and adjust these values:
-	* `DimensionCropbox` determines the width/height of the bounding box.
+	* `DimensionCropbox` determines the width/height of the bounding box. Make sure it's big enough.
 	* `HauteurCropBox` determines the vertical position of the bounding box.
 	* In this step, you are to choose values such that any subtitles are within the bounding box.
 2. 'Threshold' step : Set `Step` to 2 and adjust these values:
@@ -100,7 +104,7 @@ The idea is to download a language file from the [Tesseract-OCR/tessdata](https:
 * Manually as described above.
 
 # Known bugs
-Please tell me if you find one !
+Please tell me if you find more !
 
 * [_Written by `YuriZero` for the original `YoloCR`, in my testing I sometimes found the LSTM engine to be superior in accuracy_] Tesseract's LSTM engine produce a lower quality OCR (such as a worse italics detection).
 	* Use Legacy engine [traineddata](https://github.com/tesseract-ocr/tessdata) instead.
@@ -110,21 +114,40 @@ Please tell me if you find one !
 	* See __Warning__ in the `Windows Requirements / Install` section or apply the same solution as the problem below.
 
 * Windows : The `*.bat` scripts can fail when the default `Python` interpreter is not the same as the one used by `VapourSynth`. 
-	* To remedy that, create a file named `Python.txt` and put the path of the correct interpreter in it (eg: `C:\Program Files\Python39`).
+	* To remedy that, create a file named `Python.txt` and write in it the path of the correct interpreter (eg: `C:\Program Files\Python39\python.exe`).
 
-* Windows : For some reason `vsrepo` may encounter issues and make `VapourSynth plugin` installation impossible through the provided `0.WinAutoInstall.bat` script. The following may work :
+* Windows : For some reason `vsrepo` may encounter issues and make `VapourSynth plugin` installation impossible through the provided `0.WinAutoInstall.bat` script. In that case the following workaround may work :
 	1. [Download the compiled plugins from PyYoloCR-extra](https://gitlab.com/DRSCUI/pyyolocr-extra/-/tree/main/PyYoloCR_Win64_dependencies) and unzip it.
 	2. Copy the content of `python_site-packages` the `Python` interpreter `VapourSynth` uses `site-packages` folder (eg: `C:\Program Files\Python39\Lib\site-packages`) 
 	3. Copy the content of `VapourSynth_plugins` the `plugins` folder of `VapourSynth` (eg: `C:\Program Files\VapourSynth\plugins`)
-	* You may need to restart your computer.
+		* You may need to restart your computer.
 	4. Check if `VapourSynth Editor` can preview `YoloAIO.vpy` without error now.
 
 * `VapourSynth: Failed to initialize VapourSynth environment` : see [VapourSynth's documentation](http://www.vapoursynth.com/doc/installation.html)
+
+* `VapourSynth Editor` can crash on `Step 1` in `YoloAIO.vpy`. Please use the workaround provided there.
+
+
+# General remarks
+* Tesseract-OCR engines accuracy : For general, clear text, both engines perform admirably. The `legacy` engine can have more difficulties punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least find some characters.
+
+* Storage : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
+
+* Performance : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. On a modern 8 core machine you should experience the following speed, respectively : 0.5-2x, 1-3x, 10-20x
+
+* The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
 
 
 # Possible improvements
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
 
- * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific) and viable alternative to `Tesseract`.
- * Add _italics_ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
+ * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific?) and viable alternative to `Tesseract`.
+ * Add _italics_ and __bold__ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
  * Make the code less ugly / bad : I'm an amateur, so it's to be expected.
+ * Augment subtitle post-processing filtering.
+
+
+# Notice and Licensing
+This software is provided as-is, without any warranties of any kind. Use it at your own risk. You can find the full license in the `LICENSE` file included in this repository.
+
+To avoid fragmentation, please only fork this project if you intend to significantly improve it in some way, and in that case prefer issuing a pull request instead if possible.

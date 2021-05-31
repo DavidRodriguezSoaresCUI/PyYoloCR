@@ -1,6 +1,19 @@
-# <script call> <filterdvideo:str> <[opt]lang:str>
+''' Copyright 2021 David Rodriguez
 
-from typing import List, Union, Set
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+'''
+
+from typing import List, Union
 from pathlib import Path
 import multiprocessing as mp
 import pytesseract
@@ -29,7 +42,7 @@ def OCR_scene( scene_id: int, lang: str ) -> str:
         ( img, lang, Tesseract_CFG )
         for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
     ]
-    _thr = int(_getThreads()/2)
+    _thr = int(_getThreads() * .8)
     pool = mp.Pool(processes=_thr)
     return pool.map( f, args )
 
@@ -55,7 +68,9 @@ def execute( call: Union[str,List[str]] ) -> dict():
         for i in range(2)
     }
 
+
 def debugvar( v, vname ):
+    # Useful for developpers, gives various infos about a variable
     print(f"DEBUG: {vname}={v} ({type(v)})")
 
 
@@ -92,32 +107,17 @@ def choose( choices: List[str], msg: str = 'Choice' ) -> str:
             print("Invalid choice")
 
 
-def select_file( msg: str ) -> Path:
-    while True:
-        f = Path(__input(msg + ' : '))
-        if f.is_file():
-            return f.resolve()
-        print(f"Error: '{f}' not found or is not a file.")
-
-
-def check_ext_programs() -> bool:
+def check_ext_programs() -> None:
     ''' Ensures required and optional external programs can be called, and display their version.
     Exits on error with required programs.
     Returns GUI mode [bool]
     '''
-
-    GUI_mode = True
 
     software_not_found_msg = lambda x: f"Could not retrieve {x[0]}'s version. Make sure it is installed on this system and '{' '.join(x)}' can be called on your shell." if isinstance(x,list) else f"Could not retrieve {x[0][0]}'s version. Make sure it is installed on this system and `{'` or `'.join(' '.join(y) for y in x)}` can be called on your shell."
 
     def no_mandatory_prg( __call ):
         LOG.error( software_not_found_msg(__call) )
         sys.exit(1)
-
-    def no_sxiv( *args ):
-        LOG.warning("sxiv was not found on this system. GUI interactive mode disabled")
-        global GUI_mode
-        GUI_mode = False
 
     programs = [
         {
@@ -134,11 +134,6 @@ def check_ext_programs() -> bool:
             'call': ([ 'tesseract', '-v' ], [ 'tesseract', '--version' ]),
             're.version': r'tesseract v?([\d.]+)',
             'failure': no_mandatory_prg
-        },
-        {
-            'call': [ 'sxiv', '-v' ],
-            're.version': r'sxiv ([\d.]+)',
-            'failure': no_sxiv
         }
     ]
 
@@ -168,8 +163,7 @@ def check_ext_programs() -> bool:
             LOG.info( f"Found {prg_name} {version} !" )
             continue
         prg['failure']( __call )
-
-    return GUI_mode
+        
 
 
 def frame2timestamp_SRT( frame, fps ):
@@ -202,15 +196,16 @@ class Interval:
                 a = b = i
                 continue
 
-            if i == b+1:
-                # Interval continues
+            if i==b+1: #i > b and i <= b+3:
+                # Interval continues : accepts "gaps" up to 2-wide
                 b = i
                 continue
             
             # Interval ends
             if a + min_interval <= b:
                 intervals.add( Interval( a, b ) )
-                
+            else:
+                LOG.warning(f"Discarded interval : [{a},{b}]")
             a = b = i
 
         if a and a + min_interval <= b:
@@ -223,7 +218,7 @@ class Interval:
                 if interval.contains( i ):
                     return interval
 
-        split_list_useful = False
+        split_list_useful = 0
         for split_i in split_list:
             interval_to_split = interval2split( split_i )
             if interval_to_split is None:
@@ -234,13 +229,12 @@ class Interval:
                 continue
             # successful split : replace `interval_to_split` with intervals in `tentative_split` in `intervals`
             LOG.debug(f"Split interval : {repr(interval_to_split)} -> {repr(tentative_split[0])} + {repr(tentative_split[1])}")
-            split_list_useful = True
+            split_list_useful += 1
             intervals.discard( interval_to_split )
             intervals.add( tentative_split[0] )
             intervals.add( tentative_split[1] )
 
-        if not split_list_useful:
-            LOG.info(f"No interval was split from 'split_list' :(")
+        LOG.debug( f"No interval was split from 'split_list' :(" if split_list_useful==0 else f"{split_list_useful} interval(s) were split from 'split_list' !" )
 
         return list( sorted( intervals, key=lambda x: x.a ) )
 
@@ -257,12 +251,12 @@ class Interval:
         return (self.a <= val and val <= self.b) if inclusive else (self.a < val and val < self.b)
 
     def split( self, at: int, min_interval: int = 1 ) -> List:
-        ''' [a,b] -> [a,at], [at+1,b] '''
+        ''' [a,b] -> [a,at-1], [at,b] '''
         if not self.contains( at, inclusive=False ):
             return None
         
         try:
-            res = [ Interval(self.a,at), Interval(at+1,self.b) ]
+            res = [ Interval(self.a,at-1), Interval(at,self.b) ]
         except AssertionError:
             return None 
         if all( [ interval.len >= min_interval for interval in res ] ):
@@ -290,32 +284,7 @@ class Interval:
     def add_padding( self, padding: int ):
         self.a -= padding
         self.b += padding
-
-''' DEPRECATED        
-def OCR_Tesseract( img: Path, lang: str ) -> dict:
-    from pytesseract import Output
-    tmp = {
-        k:v[4:]
-        for k,v in pytesseract.image_to_data( 
-            str(img),
-            lang=lang,
-            config=Tesseract_CFG,
-            output_type=Output.DICT
-        ).items()
-        if k=='conf' or k=='text'
-    }
-    _len_txt = len(tmp['text'])
-    assert len(tmp['conf']) == _len_txt
-    tmp['len'] = _len_txt
-    return tmp
-
-
-def OCR_scene( scene_id: int, lang: str ) -> str:
-    return [ 
-        OCR_Tesseract( img, lang ) 
-        for img in filteredScreensDir.glob(f"primary_scene{scene_id}-*.jpg") 
-    ]
-'''
+        
 
 def guess_text( ocr_data ):
     # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
@@ -348,8 +317,6 @@ def _getThreads():
         return (int)(os.environ['NUMBER_OF_PROCESSORS'])
     else:
         return (int)(os.popen('grep -c cores /proc/cpuinfo').read())
-
-
 
 
 def deduplicate_subtitles( subtitles ):
@@ -385,29 +352,47 @@ def deduplicate_subtitles( subtitles ):
     
 
 def subtitle_normaization( txt: str, lang: str ) -> str:
+    # Here is the section dedicated to correcting common OCR mistakes
+    # Notice : substitutions that correct the original text (eg. that correct accents on capitals in french) are to be avoided, as not the focus of this section
     res = txt
 
     # Duplicated whitespace
     res = re.sub( r'\s{2,}', ' ', res )
     # Double/simple quote normalization
-    res = re.sub( r'”', '"', res )
-    res = re.sub( r'‘', '\'', res )
+    res = res.replace( '”', '"' )
+    res = res.replace( '‘', "'" )
+    # More symbols
+    res = res.replace('’', "'")
+    res = res.replace('—','-')
+    res = res.replace('.…','…')
+    res = res.replace('….','…')
+    res = res.replace('...','…')
+    # Merged characters(character ligature)
+    res = res.replace('ﬁ','fi')
+    res = res.replace('ﬂ','fl')
 
     if lang=='eng':
-        # Malformed 'I' capitalization
+        # Malformed 'I' capitalization (or l)
+        res = res.replace('|', 'I')
         res = res.replace('|', 'I')
         res = re.sub(r'^l','I', res)
+        res = re.sub(r'1([a-z])','I\1', res)
+    if lang=='fra':
+        res = res.replace('II','Il')
+        res = res.replace('||','Il')
+        res = re.sub(r'([a-zA-Z])\s\'([a-zA-Z])','\1\'\2', res)
 
+        
     return res
 
 
-
 if __name__=='__main__':
-
+    # Necessary in Windows for multiprocessing
     mp.freeze_support()
 
-    img_fmt = 'jpg'
-    sub_padding = 0 # Padding for subtitles, in frames
+    img_fmt = 'jpg'  # 'bmp' and 'png' are technically available from FFmpeg but not recommended because slower and/or heavier
+    sub_padding = 0  # Padding for subtitles, in frames. May be useful for very slow fading subtitles. This feature has become deprecated thanks to better subtitle detection but is left here just in case.
+    Dev_mode = False # Outputs debug files and messages, for developpers
 
     # Require Python >=3.6
     ensure_min_python( [3,6] )
@@ -421,7 +406,7 @@ if __name__=='__main__':
     import sys,re
 
     import logging
-    logging.basicConfig( level=logging.INFO )
+    logging.basicConfig( level=(logging.DEBUG if Dev_mode else loging.INFO ) )
     LOG = logging.getLogger( "YoloCR" )
     
     from pprint import pformat
@@ -430,8 +415,8 @@ if __name__=='__main__':
     local_tessdata = Path('./tessdata')
     Tesseract_mode_CFG = {
         'Use legacy engine': {
-            'cfg': f"--tessdata-dir \"{local_tessdata.resolve()}\" --oem 0 --psm 6",
-            'info_msg': f"Using language OCR trained set from {local_tessdata.resolve()}",
+            'cfg': f"--oem 0 --psm 6",
+            'info_msg': f"Using language OCR trained set from {local_tessdata}",
             'tag': 'legacy'
         },
         'Use default (typically Neural nets LSTM engine)': {
@@ -441,18 +426,26 @@ if __name__=='__main__':
         }
     }
     k = 'Use default (typically Neural nets LSTM engine)'
+    Incl_lang = pytesseract.get_languages(config='')
+    Local_lang = None
     if local_tessdata.is_dir():
         # Ask user for Tesseract mode
-        k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
+        Local_lang = [ lang_file.stem for lang_file in local_tessdata.glob('*.traineddata') ]
+        if Local_lang:
+            k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
+    
+    T_mode = Tesseract_mode_CFG[k]['tag']
     Tesseract_CFG = Tesseract_mode_CFG[k]['cfg']
     LOG.info( Tesseract_mode_CFG[k]['info_msg'] )
     print()
     
-    # Ask user for language
-    T_lang = pytesseract.get_languages(config=Tesseract_CFG)
+    # Ask user for language : limited to local ./tessdata lang files for "legacy" engine
+    T_lang = Local_lang + Incl_lang if T_mode=='LSTM' else Local_lang
     assert T_lang and len(T_lang)>0
     lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
     LOG.info(f"Selected language : {lang}")
+    if Local_lang and lang in Local_lang:
+        Tesseract_CFG += f' --tessdata-dir "{local_tessdata.as_posix()}"'
     print()
 
     # filtered video file
@@ -462,7 +455,7 @@ if __name__=='__main__':
 
     # Check for external programs
     LOG.info("Checking for external dependencies ..")
-    GUI_mode = check_ext_programs()    
+    check_ext_programs()    
     LOG.info("Checking for external dependencies OK\n")
             
 
@@ -474,14 +467,13 @@ if __name__=='__main__':
         LOG.info(f"Found {filteredScreensDir}")
         files2remove = list(filteredScreensDir.glob(f'*.{img_fmt}'))
         if files2remove:
-            try:
-                input(f"Remove the {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ? Press ENTER to remove, Ctrl+C to keep.")
+            if input(f"Remove the {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ? (y/n) : ")=='y':
                 LOG.info(f"Removing {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ..")
                 for f in files2remove:
                     f.unlink()
-            except KeyboardInterrupt:
-                generate_screens = False
-            
+            else:
+                generate_screens = False 
+
     else:
         LOG.info(f"Created {filteredScreensDir}")
         filteredScreensDir.mkdir()
@@ -494,53 +486,6 @@ if __name__=='__main__':
     ffprobe_FPS_stdX = execute( ["ffprobe", '-v', '0', '-select_streams', 'v', '-print_format', 'flat', '-of', 'default=noprint_wrappers=1:nokey=1', '-show_entries', 'stream=r_frame_rate', str(video)] )
     assert ffprobe_FPS_stdX['stdout'] and ffprobe_FPS_stdX['stderr'] is None
     video_FPS = eval(ffprobe_FPS_stdX['stdout'].rstrip())
-    #debugvar(video_FPS,'video_FPS')
-
-
-    # Load `SceneChanges.log`, process it to make timecoded scenes. Do the same for `SceneChangesAlt.log`
-    LOG.info(f"Loading SceneChange files ..")
-    SceneChangeFiles = {
-        'primary': Path('SceneChanges.log'),
-        'alt'    : Path('SceneChangesAlt.log'),
-    }
-    Scenes = dict()
-    for label,SCfile in SceneChangeFiles.items():
-        if not SCfile.is_file():
-            LOG.info(f"{SCfile} doesn't exits.")
-            continue
-        tmp = decodeSC( SCfile.read_text().splitlines()[1:] )
-        Scenes[label] = tmp
-        LOG.info(f"{SCfile} contained {len(tmp)} scenes !")
-    LOG.info(f"Loading SceneChange files OK\n")
-
-    # DEPRECATED SECTION
-    # Use ffmpeg to extract scenechange frames to jpg
-    # `ffmpeg -loglevel error -ss $(echo "if ($b-$a-0.003>2/'$FPS') x=($b+$a)/2 else x=$a; if (x<1) print 0; x" | bc -l) -i '\"$FilteredVideo\"' -vframes 1 '$Crop' ScreensFiltrés/$(convertsecs "$a")-$(convertsecs "$b").jpg`
-    # call command from https://superuser.com/questions/1009969/how-to-extract-a-frame-out-of-a-video-using-ffmpeg and https://video.stackexchange.com/questions/19873/extract-specific-video-frames
-    # LOG.info(f"Generating frames from video ..")
-
-    # out_file_fmt = str( filteredScreensDir / 'a.tmp' ).replace( 'a.tmp', '{}_scene{}-{}.'+img_fmt )
-    # out_file = lambda label,sceneidx: out_file_fmt.format( label, sceneidx, '%d' )
-
-    # res = [
-    #     [
-    #         'ffmpeg', 
-    #         '-i', str(video),
-    #         '-vf', f"select=between(n\,{scene['start']['frame']}\,{scene['stop']['frame']})",
-    #         '-frames', str(scene['stop']['frame'] - scene['start']['frame'] + 1),
-    #         '-vsync', '0',
-    #         out_file( label, idx )
-    #     ]
-    #     for label, scenes in Scenes.items()
-    #     for idx,scene in enumerate(scenes)
-    # ]
-    # # from pprint import pformat
-    # # Path('debug.log').write_text(pformat(res))
-    # # for idx,__call in enumerate(res):
-    # #     LOG.info( f"Processing scene {idx} .." )
-    # #     execute( __call )
-
-    # LOG.info(f"Generating frames from video OK")
 
 
     # Scene Detection : Combination of stats : NonBlackFrames and SceneChanges
@@ -550,7 +495,6 @@ if __name__=='__main__':
     stat_scenechanges_f = Path('stat_scenechanges.log')
     assert stat_scenechanges_f.is_file()
     stat_scenechanges = [ int(s) for s in stat_scenechanges_f.read_text().splitlines() if s ]
-    from pprint import pprint
     scenes = Interval.from_list(stat_nonblackframes, min_interval=int(video_FPS*.5), split_list=stat_scenechanges )
     print(f"Found {len(scenes)} scenes")
 
@@ -569,16 +513,18 @@ if __name__=='__main__':
         ]
         for idx,scene in enumerate(scenes)
     ]
-    # from pprint import pformat
-    # Path('debug.log').write_text(pformat(res))
+    
     if generate_screens:
         LOG.info(f"Generating frames from video ..")
-        bar = Bar('Processing scenes', max=len(res))
+        if not Dev_mode:
+            bar = Bar('Processing scenes', max=len(res))
         for idx,__call in enumerate(res):
             LOG.debug( f"Processing scene {idx} ({scenes[idx].len} frames, timestamp={scenes[idx].timestamp(video_FPS)}) .." )
-            bar.next()
+            if not Dev_mode:
+                bar.next()
             execute( __call )
-        bar.finish()
+        if not Dev_mode:
+            bar.finish()
 
         LOG.info(f"Generating frames from video OK")
 
@@ -597,30 +543,36 @@ if __name__=='__main__':
 
     print()
     subtitles = None
-    # Caching for performance
-    subtitles_cache_file = Path('sub.tmp')
+    # Caching for performance, typically for developper
+    subtitles_cache_file = Path(f'Tesseract-OCR.subdata.{T_mode}.{lang}.pickle')
     import pickle
-    if subtitles_cache_file.is_file():
+    if Dev_mode and subtitles_cache_file.is_file():
         with subtitles_cache_file.open("rb") as f:
             subtitles = pickle.load( f )
 
     if subtitles is None:
         subtitles = [ None for _ in range(len(scenes)) ]
-        bar = Bar( message="OCR with Tesseract", max=len(scenes))
+        if not Dev_mode:
+            bar = Bar( message="OCR with Tesseract", max=len(scenes))
         for idx,scene in enumerate(scenes):
+            LOG.debug( f"OCR scene {idx} .." )
             subtitles[idx] = {
                 'scene': scene ,
                 'text' : OCR_scene(idx, lang)
             }
-            bar.next()
-        bar.finish()
-        LOG.info(f"OCR caching results ({subtitles_cache_file}).")
-        with subtitles_cache_file.open("wb") as f:
-            pickle.dump( subtitles, f )
+            if not Dev_mode:
+                bar.next()
+        if not Dev_mode:
+            bar.finish()
+        if Dev_mode:
+            LOG.info(f"OCR caching results ({subtitles_cache_file}).")
+            with subtitles_cache_file.open("wb") as f:
+                pickle.dump( subtitles, f )
     else:
         LOG.info(f"OCR cache hit ({subtitles_cache_file}).")
 
-    Path('debug.ocr_data.log').write_text(pformat(subtitles), encoding='utf8')
+    if Dev_mode:
+        Path('debug.ocr_data.log').write_text(pformat(subtitles), encoding='utf8')
     
     # guess scene text from OCR'ed frame text
     for __s in subtitles:
@@ -631,18 +583,19 @@ if __name__=='__main__':
     for subtitle in subtitles:
         subtitle['text'] = subtitle_normaization( subtitle['text'], lang )        
     
-    Path('debug.subtitles.log').write_text(pformat(subtitles), encoding='utf8')
+    if Dev_mode:
+        Path('debug.subtitles.log').write_text(pformat(subtitles), encoding='utf8')
 
     # De-duplicate subtitles
     subtitles = deduplicate_subtitles( subtitles )
-    Path('debug.sub_ok.log').write_text(pformat(subtitles), encoding='utf8')
+    if Dev_mode:
+        Path('debug.sub_deduplicated.log').write_text(pformat(subtitles), encoding='utf8')
 
 
     # Add Padding to subtitles
     if sub_padding:
         for subtitle in subtitles:
             subtitle['scene'].add_padding(sub_padding)
-
     
 
     # Writing subtitles to file
@@ -662,11 +615,6 @@ if __name__=='__main__':
 
     # Alternative : OCR with FineReader :
     # ???
-
-    # text -> ASS
-    # ASS uses INI-style sections
-    # warning: convert tags for italic/others to valid ASS tag
-    # add correction for common OCR mistakes and normalization for punctuation.
 
 
 
