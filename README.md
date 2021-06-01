@@ -101,7 +101,7 @@ You can find descriptions and advice on each parameter in `YoloAIO.vpy`, but her
 For more help, check these resources (may not apply directly) : [original YoloCR's README](https://bitbucket.org/YuriZero/yolocr/src/master/), [Subbing tutorial by __subarashii-no-fansub__](https://subarashii-no-fansub.github.io/Subbing-Tutorial/OCR-Hardsub-Videos/)
 
 ## Tesseract: Adding new languages / languages that work with legacy engine
-The idea is to download a language file from the [Tesseract-OCR/tessdata](https://github.com/tesseract-ocr/tesseract/tree/master/tessdata) repository and put it into the local `tessdata` folder. Choose the method you prefer:
+The idea is to download a language file from the [Tesseract-OCR/tessdata](https://github.com/tesseract-ocr/tessdata) repository and put it into the local `tessdata` folder. Choose the method you prefer:
 * On Windows, simply use the `0.TesseractDownloadLanguage.bat` script : you type the language code (eg: 'eng' for english) and it downloads it for you.
 * On Linux, type the following command from the `PyYoloCR` folder : `wget https://github.com/tesseract-ocr/tessdata/blob/master/<lang-code>.traineddata?raw=true -O tessdata/<lang-code>.traineddata` (replace `<lang-code>` by the actual language code).
 * Manually as described above.
@@ -132,13 +132,18 @@ Please tell me if you find more !
 
 
 # General remarks
-* Tesseract-OCR engines accuracy : For general, clear text, both engines perform admirably well. The `legacy` engine can have more difficulties on punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least finds some characters.
+* __Tesseract-OCR engines accuracy__ : For general, clear text, both engines perform admirably well. The `legacy` engine can have more difficulties on punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least finds some characters.
 
-* Storage : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
+* __Storage__ : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
 
-* Performance : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. For reference, on a modern 8 core machine you should experience the following speeds, respectively : 0.5-2x, 1-3x, 10-20x
+* __Performance__ : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. For reference, on a modern 8 core machine you should experience the following speeds, respectively : 0.5-2x, 1-3x, 10-20x
 
-* The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
+* __Naming__ : The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
+
+## Compatibility
+SubXtract was successfully tested on the following system configurations : `Ubuntu 20.04.2 LTS` (64bit), `Windows 20H2` and `21H1` (64-bit).
+
+Theoretically, SubXtract _should_ work on any system that complies with requirements, but keep in mind the following : Other OSs, and architectures that are not x86-64, are UNTESTED and may exhibit issues or not work at all, and will not be developped for by me.
 
 
 # Possible improvements
@@ -151,6 +156,8 @@ I don't really take feature requests, so you may need to do it yourself. These a
 
 
 # Notice and Licensing
+The software contained in this repository is the property of `David Rodriguez`, except portions of code that are the property of bitbucket user `YuriZero`.
+
 This software is provided as-is, without any warranties of any kind. Use it at your own risk. You can find the full license in the `LICENSE` file included in this repository.
 
 To avoid fragmentation, please only fork this project if you intend to significantly improve it in some way, and in that case prefer issuing a pull request instead if possible.

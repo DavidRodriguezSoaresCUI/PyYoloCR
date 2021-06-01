@@ -406,7 +406,7 @@ if __name__=='__main__':
     import sys,re
 
     import logging
-    logging.basicConfig( level=(logging.DEBUG if Dev_mode else loging.INFO ) )
+    logging.basicConfig( level=(logging.DEBUG if Dev_mode else logging.INFO ) )
     LOG = logging.getLogger( "YoloCR" )
     
     from pprint import pformat
@@ -515,7 +515,8 @@ if __name__=='__main__':
     ]
     
     if generate_screens:
-        LOG.info(f"Generating frames from video ..")
+        nbFrames2extract = sum([ sc.len for sc in scenes ])
+        LOG.info(f"Extracting {nbFrames2extract} frames from video ..")
         if not Dev_mode:
             bar = Bar('Processing scenes', max=len(res))
         for idx,__call in enumerate(res):
@@ -526,7 +527,7 @@ if __name__=='__main__':
         if not Dev_mode:
             bar.finish()
 
-        LOG.info(f"Generating frames from video OK")
+        LOG.info(f"Extracting frames from video OK")
 
     # Finereader section : TODO
     # Windows: Find `Finereader.exe`. If found, make the user choose OCR engine.
