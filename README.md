@@ -151,7 +151,7 @@ Theoretically, SubXtract _should_ work on any system that complies with requirem
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
 
  * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific?) and viable alternative to `Tesseract`.
- * Add _italics_ and __bold__ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
+ * Add _italics_ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
  * Make the code less ugly / bad : I'm an amateur, so it's to be expected.
  * Augment subtitle post-processing filtering.
 
