@@ -277,7 +277,7 @@ class Interval:
         return '-'.join(
             [
                 frame2timestamp(x, fps)
-                for x in [self.a,self.b]
+                for x in [self.a,self.b+1]
             ]
         )
 
@@ -305,12 +305,9 @@ def guess_text( ocr_data ):
     from collections import defaultdict
     any2int = lambda x: x if isinstance(x,int) else ( int(x) if isinstance(x,float) else int(float(x)))
     words = [ defaultdict( lambda: 0 ) for _ in range(text_length) ]
-    NLdetected = False
     for frame in ocr_data:
         text, conf, newline_idx = frame['text'], frame['conf'], detect_value_increment(frame['line_num'])
-        if newline_idx:
-            LOG.info(f"Line '{text}' contains line break at positions {newline_idx}")
-            NLdetected = True
+        
         for i in range(text_length):
             _word = text[i] + ( '\n' if i in newline_idx else '' )
             (words[i])[ _word ] += any2int( conf[i] )
@@ -322,9 +319,6 @@ def guess_text( ocr_data ):
 
     # Assemble words in phrase, with spaces and newlines
     guess_line = re.sub( r'\n\s+', r'\n', ' '.join( guess_words ) )
-
-    if NLdetected:
-        LOG.info(f"Line contains line break : {guess_line}")
 
     return guess_line
 
@@ -432,40 +426,79 @@ if __name__=='__main__':
     from pprint import pformat
     from math import floor
 
+
+    # dealing with arguments
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--engine",
+        action='store',
+        nargs=1,
+        default=None,
+        choices=['legacy','LSTM','legacy+LSTM'],
+        help="Select Tesseract engine."
+    )
+    parser.add_argument(
+        "-l",
+        action='store',
+        nargs=1,
+        default=None,
+        metavar='lang',
+        help="Select Tesseract language."
+    )
+    parser.add_argument(
+        "--overwrite",
+        action='store_true',
+        default=False,
+        help="Overwrite extracted frames."
+    )
+    args = parser.parse_args()
+
     # Retrieve tesseract langs
     local_tessdata = Path('./tessdata')
     Tesseract_mode_CFG = {
-        'Use legacy engine': {
+        'Use legacy engine only': {
             'cfg': f"--oem 0 --psm 6",
-            'info_msg': f"Using language OCR trained set from {local_tessdata}",
             'tag': 'legacy'
         },
-        'Use default (typically Neural nets LSTM engine)': {
-            'cfg': "--psm 6",
-            'info_msg': "Using Tesseract built-in language OCR trained set",
+        'Use Neural nets LSTM engine only': {
+            'cfg': "--oem 1 --psm 6",
             'tag': 'LSTM'
+        },
+        'Use legacy+LSTM engines': {
+            'cfg': "--oem 2 --psm 6",
+            'tag': 'legacy+LSTM'
+        },
+        'Use default engine': {
+            'cfg': "--oem 3 --psm 6",
+            'tag': 'default'
         }
     }
-    k = 'Use default (typically Neural nets LSTM engine)'
+    k = 'Use default engine'
     Incl_lang = pytesseract.get_languages(config='')
     Local_lang = list()
     if local_tessdata.is_dir():
         # Ask user for Tesseract mode
         Local_lang = [ lang_file.stem for lang_file in local_tessdata.glob('*.traineddata') ]
         if Local_lang:
-            k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
+            if args.engine:
+                k = [ n for n in Tesseract_mode_CFG.keys() if Tesseract_mode_CFG[n]['tag']==args.engine[0] ][0]
+            else:
+                k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
     
     T_mode = Tesseract_mode_CFG[k]['tag']
     Tesseract_CFG = Tesseract_mode_CFG[k]['cfg']
-    LOG.info( Tesseract_mode_CFG[k]['info_msg'] )
     print()
     
     # Ask user for language : limited to local ./tessdata lang files for "legacy" engine
-    T_lang = Local_lang + Incl_lang if T_mode=='LSTM' else Local_lang
+    T_lang = list(set(Local_lang + Incl_lang)) if ('LSTM' in T_mode) else Local_lang
     assert T_lang and len(T_lang)>0
-    lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
+    if args.l and args.l[0] in T_lang:
+        lang = args.l[0]
+    else:
+        lang = choose( T_lang, msg="Choose a language for Tesseract OCR" )
     LOG.info(f"Selected language : {lang}")
-    if Local_lang and lang in Local_lang:
+    if lang in Local_lang:
         Tesseract_CFG += f' --tessdata-dir "{local_tessdata.as_posix()}"'
     print()
 
@@ -488,7 +521,7 @@ if __name__=='__main__':
         LOG.info(f"Found {filteredScreensDir}")
         files2remove = list(filteredScreensDir.glob(f'*.{img_fmt}'))
         if files2remove:
-            if input(f"Remove the {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ? (y/n) : ")=='y':
+            if args.overwrite or input(f"Remove the {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ? (y/n) : ")=='y':
                 LOG.info(f"Removing {len(files2remove)} {img_fmt.upper()} files from {filteredScreensDir} ..")
                 for f in files2remove:
                     f.unlink()

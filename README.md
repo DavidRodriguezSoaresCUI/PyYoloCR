@@ -107,6 +107,20 @@ The idea is to download a language file from the [Tesseract-OCR/tessdata](https:
 * On Linux, type the following command from the `PyYoloCR` folder : `wget https://github.com/tesseract-ocr/tessdata/blob/master/<lang-code>.traineddata?raw=true -O tessdata/<lang-code>.traineddata` (replace `<lang-code>` by the actual language code).
 * Manually as described above.
 
+
+## YoloCRMod.py usage
+Not used in normal usage, prefer the `2.LaunchYoloCRMod` script for your system. Optional arguments take precedent over interactively asking the user to make choices when necessary. They were mainly added for tests.
+```
+YoloCRMod.py [-h] [--engine {legacy,LSTM,legacy+LSTM}] [-l lang] [--overwrite]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --engine {legacy,LSTM,legacy+LSTM}
+                        Select Tesseract engine.
+  -l lang               Select Tesseract language.
+  --overwrite           Overwrite extracted frames.
+```
+
 # Known bugs
 Please tell me if you find more !
 
@@ -154,6 +168,21 @@ I don't really take feature requests, so you may need to do it yourself. These a
  * Add _italics_ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
  * Make the code less ugly / bad : I'm an amateur, so it's to be expected.
  * Augment subtitle post-processing filtering.
+
+
+# Test suite
+__Only available for bash environments (bash on Linux, WSL on windows)__
+
+You can find a test suite in folder `tests`. Simply run `perf_test.sh` and it should be able to download a test video, extract subtitles using both `the original YoloCR` and `SubXtract`, making it easy to compare speed and OCR accuracy.
+
+Findings (as of 02.06.2021) :
+ * `SubXtract` is about 10-20 times slower than `YoloCR`
+ * `SubXtract` is better at syncing subtitles, reducing drastically the manual re-timing workload
+ * Both programs have very similar OCR accuracy. Note: this is a best-case scenario for `YoloCR`, as subtitles don't hava a fading effect applied to them.
+
+Note : This test is only focused on demonstrating the similarities and difference in accuracy of the SRT output.
+
+TODO : Test OCR accuracy in challenging scenarios (subtitles moving, fading, high noise, etc).
 
 
 # Notice and Licensing
