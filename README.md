@@ -11,6 +11,7 @@ I needed an easy, low effort and automated way to extract hardcoded subtitles (s
 
 ### Key improvements
  * __OCR performance__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_.
+ * __Usability__ : Requires less manual input in the pre-processing and post-processing steps, and in the terminal. Also on `Windows`, doesn't requires `cygwin`-related stuff.
  * __Maintainability__ : While the original `bash` code is functional and compact, it's arguably harder to maintain than a program written in a high-level language
  * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependencies means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
 
@@ -156,7 +157,7 @@ I don't really take feature requests, so you may need to do it yourself. These a
 
 
 # Notice and Licensing
-The software contained in this repository is the property of `David Rodriguez`, except portions of code that are the property of bitbucket user `YuriZero`.
+The software contained in this repository is the property of `David Rodriguez` ("me","I" in this file), except portions of code in file `YoloAIO.vpy` that are the property of bitbucket user `YuriZero`.
 
 This software is provided as-is, without any warranties of any kind. Use it at your own risk. You can find the full license in the `LICENSE` file included in this repository.
 

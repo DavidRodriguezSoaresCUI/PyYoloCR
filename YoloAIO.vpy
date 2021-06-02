@@ -381,7 +381,9 @@ elif Step==3:
 	ClipCleaned=core.std.FrameEval(ClipCleaned,functools.partial(SceneLog,clip=ClipCleaned,log=stat_scenechanges_log),prop_src=ClipCleanedSC)
 	ClipCleaned=core.std.FrameEval(ClipCleaned,functools.partial(BlackLog,clip=ClipCleaned,log=stat_nonblackframes_log),prop_src=ClipCleanedStats)
 	
-	ClipCleaned.set_output()
+	# Tesseract prefers black text on white background, so in this step the current white text on black background is inverted
+	ClipCleanedInv = core.std.Invert(ClipCleaned, planes=0)
+	ClipCleanedInv.set_output()
 
 else:
 	raise ValueError(f"Step '{Step}' is an invalid option !")

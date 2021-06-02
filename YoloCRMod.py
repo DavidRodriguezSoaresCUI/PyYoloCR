@@ -29,7 +29,7 @@ def OCR_Tesseract( arg ) -> dict:
             config=Tesseract_CFG,
             output_type=pytesseract.Output.DICT
         ).items()
-        if k=='conf' or k=='text'
+        if k=='conf' or k=='text' or k=='line_num'
     }
     _len_txt = len(tmp['text'])
     assert len(tmp['conf']) == _len_txt
@@ -287,6 +287,14 @@ class Interval:
         
 
 def guess_text( ocr_data ):
+    # new line detection
+    def detect_value_increment( values ):
+        return [
+            i
+            for i in range(len(values)-1)
+            if values[i] < values[i+1]
+        ]
+
     # 1st : not every OCR'd frame has same text length, so we only keep those with popular word count
     from statistics import mode
     text_length = mode( [ x['len'] for x in ocr_data ] )
@@ -297,16 +305,28 @@ def guess_text( ocr_data ):
     from collections import defaultdict
     any2int = lambda x: x if isinstance(x,int) else ( int(x) if isinstance(x,float) else int(float(x)))
     words = [ defaultdict( lambda: 0 ) for _ in range(text_length) ]
+    NLdetected = False
     for frame in ocr_data:
-        text, conf = frame['text'], frame['conf']
+        text, conf, newline_idx = frame['text'], frame['conf'], detect_value_increment(frame['line_num'])
+        if newline_idx:
+            LOG.info(f"Line '{text}' contains line break at positions {newline_idx}")
+            NLdetected = True
         for i in range(text_length):
-            (words[i])[ text[i] ] += any2int( conf[i] )
+            _word = text[i] + ( '\n' if i in newline_idx else '' )
+            (words[i])[ _word ] += any2int( conf[i] )
 
-    guess = ' '.join( [
+    guess_words = [
         max(word, key=word.get) # get word variation with highest combined confidence
         for word in words
-    ])
-    return guess
+    ]
+
+    # Assemble words in phrase, with spaces and newlines
+    guess_line = re.sub( r'\n\s+', r'\n', ' '.join( guess_words ) )
+
+    if NLdetected:
+        LOG.info(f"Line contains line break : {guess_line}")
+
+    return guess_line
 
 
 def _getThreads():
@@ -410,6 +430,7 @@ if __name__=='__main__':
     LOG = logging.getLogger( "YoloCR" )
     
     from pprint import pformat
+    from math import floor
 
     # Retrieve tesseract langs
     local_tessdata = Path('./tessdata')
@@ -427,7 +448,7 @@ if __name__=='__main__':
     }
     k = 'Use default (typically Neural nets LSTM engine)'
     Incl_lang = pytesseract.get_languages(config='')
-    Local_lang = None
+    Local_lang = list()
     if local_tessdata.is_dir():
         # Ask user for Tesseract mode
         Local_lang = [ lang_file.stem for lang_file in local_tessdata.glob('*.traineddata') ]
@@ -502,20 +523,35 @@ if __name__=='__main__':
     out_file_fmt = str( filteredScreensDir / (r'{}_scene{}-{}.'+img_fmt) )
     out_file = lambda label,sceneidx: out_file_fmt.format( label, sceneidx, '%d' )
 
+    # Acceleration : limit the number of frames to extract from the video. Use modulo to extract frames consistently (not all from beginning/end of scene).
+    # The 'frame objective' is a threshold to limit the number of frames to extract below the set number. Scenes with >frame_objective frames will be clamped to [ frame_objective/2, frame_objective ] frames
+    frame_objective = 30
+
+    def scene_mod( scene ):
+        if not frame_objective:
+            return 1
+        return max(1,floor(scene.len/(frame_objective/2)))
+
+    def scene_len( scene ):
+        if not frame_objective:
+            return scene.len
+        return len([ i for i in range(scene.a,scene.b) if i%scene_mod(scene)==0 ])
+
     res = [
         [
             'ffmpeg', 
             '-i', str(video),
-            '-vf', f"select=between(n\,{scene.a}\,{scene.b})",
-            '-frames', str(scene.len + 1),
+            '-vf', f"select=between(n\,{scene.a}\,{scene.b})*eq(mod(n\,{scene_mod(scene)})\,0)",
+            '-frames', str(scene_len(scene)),
             '-vsync', '0',
             out_file( 'primary', idx )
         ]
         for idx,scene in enumerate(scenes)
     ]
-    
+    import time
     if generate_screens:
-        nbFrames2extract = sum([ sc.len for sc in scenes ])
+        start_time = time.time()
+        nbFrames2extract = sum([ scene_len(sc) for sc in scenes ])
         LOG.info(f"Extracting {nbFrames2extract} frames from video ..")
         if not Dev_mode:
             bar = Bar('Processing scenes', max=len(res))
@@ -527,7 +563,7 @@ if __name__=='__main__':
         if not Dev_mode:
             bar.finish()
 
-        LOG.info(f"Extracting frames from video OK")
+        LOG.info(f"Extracting {nbFrames2extract} frames from video in {time.time() - start_time}s.")
 
     # Finereader section : TODO
     # Windows: Find `Finereader.exe`. If found, make the user choose OCR engine.
@@ -553,6 +589,7 @@ if __name__=='__main__':
 
     if subtitles is None:
         subtitles = [ None for _ in range(len(scenes)) ]
+        start_time = time.time()
         if not Dev_mode:
             bar = Bar( message="OCR with Tesseract", max=len(scenes))
         for idx,scene in enumerate(scenes):
@@ -565,6 +602,7 @@ if __name__=='__main__':
                 bar.next()
         if not Dev_mode:
             bar.finish()
+        LOG.info(f"OCR done in {time.time() - start_time}s.")
         if Dev_mode:
             LOG.info(f"OCR caching results ({subtitles_cache_file}).")
             with subtitles_cache_file.open("wb") as f:
@@ -603,9 +641,12 @@ if __name__=='__main__':
     subtitle_file = Path( f"output.{Tesseract_mode_CFG[k]['tag']}.{lang}.srt" )
     LOG.info( f"\nWriting subtitle file {subtitle_file} .." )
     SRT_format = lambda idx,ts,s: f"{idx+1}\n{ts}\n{s}\n\n"
-    with subtitle_file.open("w+",encoding='utf8') as f:
+    # Note : SRT requires Windows-style line ending (http://www.textfiles.com/uploads/kds-srt.txt)
+    with subtitle_file.open("w+",encoding='utf8', newline='\r\n') as f:
         for idx,s in enumerate(subtitles):
-            f.write( SRT_format( idx, s['scene'].timestamp_SRT(video_FPS), s['text'] ) )
+            f.write( 
+                SRT_format( idx, s['scene'].timestamp_SRT(video_FPS), s['text'] )
+            )
     LOG.info( f"Writing subtitle file {subtitle_file} OK" )
 
         
