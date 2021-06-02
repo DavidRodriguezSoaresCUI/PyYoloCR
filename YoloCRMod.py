@@ -269,7 +269,7 @@ class Interval:
         return ' --> '.join(
             [
                 frame2timestamp_SRT(x, fps)
-                for x in [self.a,self.b]
+                for x in [self.a,self.b+1]
             ]
         )
 

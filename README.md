@@ -177,12 +177,37 @@ You can find a test suite in folder `tests`. Simply run `perf_test.sh` and it sh
 
 Findings (as of 02.06.2021) :
  * `SubXtract` is about 10-20 times slower than `YoloCR`
- * `SubXtract` is better at syncing subtitles, reducing drastically the manual re-timing workload
- * Both programs have very similar OCR accuracy. Note: this is a best-case scenario for `YoloCR`, as subtitles don't hava a fading effect applied to them.
+ * Both programs have very similar OCR accuracy and subtitle syncing quality. Note: this is a best-case scenario for `YoloCR`, as subtitles don't hava a fading effect applied to them.
 
 Note : This test is only focused on demonstrating the similarities and difference in accuracy of the SRT output.
 
 TODO : Test OCR accuracy in challenging scenarios (subtitles moving, fading, high noise, etc).
+
+## Manual experiment
+The goal of this informal experiment was to quantify the time save from using `SubXtract` instead of `YoloCR`: a reduction in manual work, mainly in the post-processing step.
+
+I used a 16 minute clip of animation that had interesting properties : Subtitle font resembles Arial Black size 42 with a dithered outline, slightly transparent and with fade-in/out (~0.6s) effects applied.
+
+The filtered videos contained a lot of artifacts resulting from the permissible `SeuilO/SeuilI` values necessary to catch every character. 
+ 
+The particular nature of these subtitles was deemed appropriate to show the performance of both programs in challenging situations.
+
+
+|   | SubXtract | YoloCR |
+| --- | --- | --- |
+| Video Pre-processing | 67s | 67s |
+| Frame extraction + OCR script | 3m11s | 6s |
+| Post : Removing bad lines, deduplicating | 2m20s | 2m10 |
+| Post : Spelling correction (OCR mistakes only) | 1m50 | 5m30 |
+| Post : Synchronization (re-timing) | ~5m | >23m |
+| __"manual" sub-total__ | __~11m__ | __>32m__ |
+| __TOTAL__ | __~14m__ | __>32m__ |
+
+__Results__ : The overall reduction in manual workload is well worth the extra time the computer has to work on extracting and OCR more frames, and it was possible to mostly batch the re-timing process to cover the few frames of fade-in/out with `SubXtract`, while the same step was mostly line-by-line manual work with `YoloCR`-generated subtitles.
+
+Note : I did not record the time to fill the VPY scripts (I took the values from `YoloAIO.vpy` and put them in `YoloCR.vpy`), but it is evident `YoloCR.vpy` version is easier to work with and slightly faster.
+
+Note : Due to the copyrighted nature of the source material, I will not make any resource public. If you wish to replicate this test, you may have to burn subtitles onto a video
 
 
 # Notice and Licensing
@@ -191,3 +216,10 @@ The software contained in this repository is the property of `David Rodriguez` (
 This software is provided as-is, without any warranties of any kind. Use it at your own risk. You can find the full license in the `LICENSE` file included in this repository.
 
 To avoid fragmentation, please only fork this project if you intend to significantly improve it in some way, and in that case prefer issuing a pull request instead if possible.
+
+
+# Afterword
+I would like to thank the following people :
+ * `YuriZero`, the original creator of `YoloCR`, for the extensive ground work on which this project is based on. This project would not exist without them.
+ * All the people that worked on `Tesseract-OCR`, `pytesseract`, `VapourSynth`, used `VapourSynth plugins`, `VapourSynth Editor` and `FFmpeg`. The world is a better place thanks to these precious tools.
+ * The beautiful people at `StackOverflow` and similar forums, that provide treasures of information to anyone.
