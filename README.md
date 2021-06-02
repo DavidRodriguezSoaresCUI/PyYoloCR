@@ -151,7 +151,8 @@ Please tell me if you find more !
 
 * __Storage__ : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
 
-* __Performance__ : The longest steps are, in descending order : OCR, extracting frames with FFmpeg, encoding pre-processed video. For reference, on a modern 8 core machine you should experience the following speeds, respectively : 0.5-2x, 1-3x, 10-20x
+* __Performance__ : The longest steps are, in descending order : OCR, extracting frames with FFmpeg. For reference, on a modern 8 core machine you should experience the following speeds : 2-5x
+	* Added `frame_objective` to cap complexity per scene, thus boosting performance.
 
 * __Naming__ : The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
 
