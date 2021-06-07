@@ -10,9 +10,14 @@ This is not only a Bash -> Python 3.6+ re-implementation of the [original YoloCR
 I needed an easy, low effort and automated way to extract hardcoded subtitles (subtitles in the video stream, not in a dedicated subtitle stream). There are multiple open-source projects that share the same user need and I tried some with little success, so I chose __YoloCR__ as a base and modded it.
 
 ### Key improvements
- * __OCR performance__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_.
+ * __OCR performance consistency__ : The original implementation made compromises to lower _time complexity_ (focus on speed) that could cripple _accuracy_, rendering its ouput useless or requiring a lot of manual cleanup. __PyYoloCR__ sacrifices _speed_ for better _accuracy_. This is evident in challenging OCR scenarios, with subtitles with applied effects making them harder to OCR properly.
+
+ * __Colored subtitles support__ : [_New in 1.1.0_] Introducing a streamlined process to deal with sources containing __multiple__ subtitle colors, of __any__ color. 
+
  * __Usability__ : Requires less manual input in the pre-processing and post-processing steps, and in the terminal. Also on `Windows`, doesn't requires `cygwin`-related stuff.
+
  * __Maintainability__ : While the original `bash` code is functional and compact, it's arguably harder to maintain than a program written in a high-level language
+
  * __Cross-compatibility__ : Not relying on `Bash` and other linux-y dependencies means it can be ported more easily. Specifically I focused on making it `Windows`-friendly.
 
 # Requirements
@@ -90,14 +95,20 @@ You can find descriptions and advice on each parameter in `YoloAIO.vpy`, but her
 	* `CropBoxDimension` determines the width/height of the bounding box. Make sure it's big enough.
 	* `CropBoxElevation` determines the vertical position of the bounding box.
 	* In this step, you are to choose values such that any subtitles are within the bounding box.
-2. 'Threshold' step : Set `Step` to 2 and adjust these values:
-	* Choose the fitting `ModeS` : 'L' if you want to define a white or black threshold, succesively 'R', 'G' and 'B' otherwise.
+2. 'Color/Threshold' step : Set `Step` to 2 and adjust these values:
+	a. Identify the color(s) of subtitles.
+	b. Fill `FontColors` with `Color` instances to extract text
+	> Please take a look at the given examples in `YoloCAIO.vpy -> FontColors`.
 	* `SeuilI` : the inline threshold value (decrease it if it improves the clarity of the letters)
 	* `SeuilO` : the outline threshold value (increase it if some letters got erased)
 	* Note : `SeuilO` < `SeuilI`
 	* Adjust the Threshold with the help of the "Color Panel" found in the **F5** window.
+	* See `YoloCAIO.vpy` for more information on all thresholds and how to declare a `Color`.
+	* You can see individual color planes, with information about included color ranges, by setting `SelectColor` to the index of the corresponding color.
+
+	> Note : Colors `'white'`/`'black'` use an extraction technique based on `YuriZero`'s, RGB colors use a simpler color-band-pass filter, thus they use different parameters.
 3. 'OCR' step : Set `Step` to 3 and verify that previously set values capture all the subtitles and minimize artifacts
-	* Typically you will play with `SeuilO` and `SeuilI` to maximise subtitle clarity and minimize artifacts.
+	* If you see that there are subtitle text detection issues (joined/undetected subtitle) in `YoloCRMod`, chances are there is an issue with thresholds that detect scene change and text. You can try setting `Stat_debug` to True and find better values for `SeuilSCD` and `MinTextThr`.
 
 For more help, check these resources (may not apply directly) : [original YoloCR's README](https://bitbucket.org/YuriZero/yolocr/src/master/), [Subbing tutorial by __subarashii-no-fansub__](https://subarashii-no-fansub.github.io/Subbing-Tutorial/OCR-Hardsub-Videos/)
 
@@ -149,10 +160,11 @@ Please tell me if you find more !
 # General remarks
 * __Tesseract-OCR engines accuracy__ : For general, clear text, both engines perform admirably well. The `legacy` engine can have more difficulties on punctuation, mostly corrected by automatic post-processing. On difficult conditions (text with artifacts due to non-text background leaking into pre-processed frames) `LSTM` engine tends to fail hard, outputing unusable text, where `legacy` usually at least finds some characters.
 
-* __Storage__ : You need space to store the pre-processed video and the frames that will be extracted. This may require a few gigabytes.
+* __Storage__ : You need space to store the pre-processed video and the frames that will be extracted. This may require a few hundred Megabytes.
 
-* __Performance__ : The longest steps are, in descending order : OCR, extracting frames with FFmpeg. For reference, on a modern 8 core machine you should experience the following speeds : 2-5x
+* __Performance__ : The longest steps are obviously OCR, then extracting frames with FFmpeg and produciing the video. On a modern machine the process should complete in a fraction of the duration of the video source (faster on a SSD!).
 	* Added `frame_objective` to cap complexity per scene, thus boosting performance.
+	* Note that the compute time is almost certainly shorter than the time it takes to manually set `YoloAIO.vpy` and cleanup the output SRT.
 
 * __Naming__ : The original name of this project was __PyYoloCR__, but I found it verbose and not very "user-facingly descriptive" so it was changed to __SubXtract__, keeping the original name as _codename_.
 
