@@ -374,6 +374,7 @@ def subtitle_normaization( txt: str, lang: str ) -> str:
     res = re.sub( r'\s{2,}', ' ', res )
     # Double/simple quote normalization
     res = res.replace( '”', '"' )
+    res = res.replace( '“', '"' )
     res = res.replace( '‘', "'" )
     # More symbols
     res = res.replace('’', "'")
@@ -476,23 +477,21 @@ if __name__=='__main__':
     }
     k = 'Use default engine'
     Incl_lang = pytesseract.get_languages(config='')
-    Local_lang = list()
-    if local_tessdata.is_dir():
-        # Ask user for Tesseract mode
-        Local_lang = [ lang_file.stem for lang_file in local_tessdata.glob('*.traineddata') ]
-        if Local_lang:
-            if args.engine:
-                k = [ n for n in Tesseract_mode_CFG.keys() if Tesseract_mode_CFG[n]['tag']==args.engine[0] ][0]
-            else:
-                k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
+    
+    # Ask user for Tesseract mode
+    if args.engine:
+        k = [ n for n in Tesseract_mode_CFG.keys() if Tesseract_mode_CFG[n]['tag']==args.engine[0] ][0]
+    else:
+        k = choose( list(Tesseract_mode_CFG.keys()), msg="Please choose a mode for Tesseract-OCR" )
     
     T_mode = Tesseract_mode_CFG[k]['tag']
     Tesseract_CFG = Tesseract_mode_CFG[k]['cfg']
     print()
     
     # Ask user for language : limited to local ./tessdata lang files for "legacy" engine
+    Local_lang = [ lang_file.stem for lang_file in local_tessdata.glob('*.traineddata') ] if local_tessdata.is_dir() else list()
     T_lang = list(set(Local_lang + Incl_lang)) if ('LSTM' in T_mode) else Local_lang
-    assert T_lang and len(T_lang)>0
+    assert T_lang and len(T_lang)>0, f"Error: No language detected for Tesseract in mode '{T_mode}' ! Please install one in folder {local_tessdata}."
     if args.l and args.l[0] in T_lang:
         lang = args.l[0]
     else:

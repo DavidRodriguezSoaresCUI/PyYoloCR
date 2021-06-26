@@ -37,11 +37,17 @@ def ordinal_expr( idx ):
 	return chr(_ord)
 
 
+class Coordinate:
+	def __init__( self, x, y ):
+		self.x = x
+		self.y = y
+
+
 class Color:
 	NON_RGB_COLORS = { 'white', 'black' }
 	RGB = [ 'R', 'G', 'B' ]
 
-	def __init__( self, color: List[int], SeuilI: int = 200, SeuilO: int = 90, marginRel: float = 0.25, marginAbs: int = 25 ):
+	def __init__( self, color: Union[str,List[int]], SeuilI: int = 200, SeuilO: int = 90, marginRel: float = 0.25, marginAbs: int = 25 ):
 		assert isinstance(color, list) or color in self.NON_RGB_COLORS, f"Color.init: ERROR: color {color} not in {self.ACCEPTED_COLORS} !"
 		type_assert( 
 			v=SeuilI, 

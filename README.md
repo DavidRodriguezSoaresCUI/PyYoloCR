@@ -177,10 +177,15 @@ Theoretically, SubXtract _should_ work on any system that complies with requirem
 # Possible improvements
 I don't really take feature requests, so you may need to do it yourself. These are just a few feature ideas for forks.
 
- * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular (Windows-specific?) and viable alternative to `Tesseract`.
+ * Add support for [ABBYY FineReader](https://pdf.abbyy.com) as alternative OCR engine, because apparently it's a popular and viable alternative to `Tesseract`.
+     > I'm not sure it was actually implemented in the original `YolOCR`, so I'm not even going to attempt it.
+
+	 > [Another similar project](https://www.videohelp.com/software/VideoSubFinder) based on `FineReader` uses the GUI.
+
+     > Note : It seems the CLI version of ABBYY FineReader is Linux-only AND deprecated, and was "replaced" by an online service or SDK or whatever.
  * Add _italics_ detection : originally in `YoloCR` and scrapped in `PyYoloCR`.
  * Make the code less ugly / bad : I'm an amateur, so it's to be expected.
- * Augment subtitle post-processing filtering.
+ * Augment subtitle post-processing filtering : _work in progress_
 
 
 # Test suite
@@ -197,6 +202,8 @@ Note : This test is only focused on demonstrating the similarities and differenc
 TODO : Test OCR accuracy in challenging scenarios (subtitles moving, fading, high noise, etc).
 
 ## Manual experiment
+This test was done using a pre-release version of `SubXtract` (pre-`v1.0.0`).
+
 The goal of this informal experiment was to quantify the time save from using `SubXtract` instead of `YoloCR`: a reduction in manual work, mainly in the post-processing step.
 
 I used a 16 minute clip of animation that had interesting properties : Subtitle font resembles Arial Black size 42 with a dithered outline, slightly transparent and with fade-in/out (~0.6s) effects applied.
@@ -218,7 +225,7 @@ The particular nature of these subtitles was deemed appropriate to show the perf
 
 __Results__ : The overall reduction in manual workload is well worth the extra time the computer has to work on extracting and OCR more frames, and it was possible to mostly batch the re-timing process to cover the few frames of fade-in/out with `SubXtract`, while the same step was mostly line-by-line manual work with `YoloCR`-generated subtitles.
 
-Note : I did not record the time to fill the VPY scripts (I took the values from `YoloAIO.vpy` and put them in `YoloCR.vpy`), but it is evident `YoloCR.vpy` version is easier to work with and slightly faster.
+Note : I did not record the time to fill the VPY scripts (I took the values from `YoloAIO.vpy` and put them in `YoloCR.vpy`), but it is evident `YoloAIO.vpy` version is easier to work with (_relative values instead of absolute, more value checking, etc_) thus slightly faster.
 
 Note : Due to the copyrighted nature of the source material, I will not make any resource public. If you wish to replicate this test, you may have to burn subtitles onto a video
 

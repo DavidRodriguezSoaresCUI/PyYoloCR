@@ -25,7 +25,7 @@ from pathlib import Path; import sys, importlib; from importlib import reload
 sys.path.append(str(Path('.').resolve()))
 import YoloAIO
 YoloAIO = reload(YoloAIO)
-Color, makeMOD2, ordinal_expr = YoloAIO.Color, YoloAIO.makeMOD2, YoloAIO.ordinal_expr
+Coordinate, Color, makeMOD2, ordinal_expr = YoloAIO.Coordinate, YoloAIO.Color, YoloAIO.makeMOD2, YoloAIO.ordinal_expr
 
 
 #################################### Adjustment Variables ####################################
@@ -33,7 +33,7 @@ Color, makeMOD2, ordinal_expr = YoloAIO.Color, YoloAIO.makeMOD2, YoloAIO.ordinal
 VideoSrc=r'!!!VIDEO_FILE_HERE!!!'
 
 # Main adjustment variables : finding good values is essential
-Step=3 # 0:VapourSynth crash workaround, 1:Resize, 2:Seuil, 3:CR
+Step=1 # 0:VapourSynth crash workaround, 1:Resize, 2:Seuil, 3:CR
 # Step 1 : adjusting bounding box for subtitles
 CropBoxDimension=[0.9,0.2]  # in [0,1]; Width, Height of box for subtitles
 CropBoxElevation=0.04       # in [0,1-CropBoxDimension[1]]; How "high" (far from the bottom) should the text box be
@@ -75,6 +75,7 @@ try:
 	import vapoursynth as vs
 	if ModeU=='znedi3':
 		import edi_rpow2 as edi
+	from collections.abc import Iterable
 except ImportException as e:
 	raise ImportException(f"Error while trying to import required plugins and libraries : {e}\nYou may have not installed them properly.")
 
@@ -139,6 +140,13 @@ def YUV2RGB( YUVclip ):
 	c = core.fmtc.resample(clip=YUVclip, css="444")
 	c = core.fmtc.matrix(clip=c, mat="709", col_fam=vs.RGB)
 	return core.fmtc.bitdepth(clip=c, bits=8)
+
+
+def RGB2YUV( RGBclip ):
+	# Simplistic RGB2YUV for Y plane extraction
+	c = core.fmtc.matrix (clip=RGBclip, mat="709", col_fam=vs.YUV, bits=16)
+	c = core.fmtc.resample (clip=c, css="420")
+	return core.fmtc.bitdepth (clip=c, bits=8)
 
 
 def SuperSampleClip( Clip, Ss, ModeU, Ssbis ):
@@ -221,11 +229,15 @@ def YuriZeroBinarize( clip, SeuilI, SeuilO ):
 
 
 def binarize_RGB_from_color( RGBplanes, RGBcolor, text_info: int = 0 ):
-	res = core.std.Expr( clips=RGBplanes, expr=RGBcolor.color_isolation_expression() )
+	out_gray = core.std.Expr( clips=RGBplanes, expr=RGBcolor.color_isolation_expression() )
 	if 0 < text_info:
 		# alignment : cast [1,..] to [1,9]
-		res = core.text.Text( res, text=str(RGBcolor) + '\n' + RGBcolor.color_range(), alignment=((text_info-1)%9)+1 )
-	return res
+		out_gray = core.text.Text( out_gray, text=str(RGBcolor) + '\n' + RGBcolor.color_range(), alignment=((text_info-1)%9)+1 )
+	
+	return out_gray
+	# RGB -> YUV -> Y conversion
+	#out_YUV = RGB2YUV( out_RGB )
+	#return core.std.ShufflePlanes(clips=out_YUV, planes=0, colorfamily=vs.GRAY)
 	
 	
 def ExtractColorPlanes( YUVclip, colors, debug=False ):
@@ -262,17 +274,54 @@ def ExtractColorPlanes( YUVclip, colors, debug=False ):
 			return YuriZeroBinarize( core.std.Invert(Yclip, planes=0), color.SeuilI, color.SeuilO )
 		raise ValueaError(f"ExtractColorPlanes: Unexpected state: color={color} doesn't trigger a behavior.")
 			
-	return [ ExtractPlane( Yclip, RGBplanes, color ) for color in colors ]
-
-
-	
+	return [ 
+		ExtractPlane( Yclip, RGBplanes, color )
+		for color in colors
+	]
 
 
 Ss, Ssbis = SSdecision( Clip )
 
-# Cropped clip, defined by CropBoxDimension, CropBoxElevation and video_source's dimensions
-ClipTextBox = core.std.CropAbs(clip=Clip,width=CropBoxDimension[0],height=CropBoxDimension[1],left=LeftCropBox,top=Clip.height-CropBoxElevation-CropBoxDimension[1])
+#
+# Let A,B,C,D be defined as :
+#
+#         Original video
+#     A------------------------------------------------+
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |                                                |
+#     |          Subtitle box                          |
+#     |       C---------------------------+            |
+#     |       |                           |            |
+#     |       |                           |            |
+#     |       |                           |            |
+#     |       |                           |            |
+#     |       +---------------------------D            |
+#     |                                                |
+#     +------------------------------------------------B
+#                                                        
+#
+A = Coordinate(0,0)
+B = Coordinate(Clip.width,Clip.height)
+C = Coordinate( LeftCropBox, Clip.height-CropBoxElevation-CropBoxDimension[1] )
+D = Coordinate( LeftCropBox+CropBoxDimension[0], Clip.height-CropBoxElevation )
 
+# Cropped clip, defined by CropBoxDimension, etc
+ClipTextBox = core.std.CropAbs(
+	clip=Clip,
+	width=CropBoxDimension[0],
+	height=CropBoxDimension[1],
+	left=C.x,
+	top=C.y
+)
 
 
 if Step==-1:
@@ -306,22 +355,50 @@ if Step==-1:
 	
 
 elif Step in [0,1]:
+	# Step 1 makes anything outside of "ClipTextBox" grayscale, and puts a magin in ClipTextBox,
+	# all of this to make it easier to correctly place the crop box
+	# Because of how Vapoursynth works, this involves splitting every frame into top,right,
+	# bottom, left components and reassemble the full frame later.
+	#
+	#     A--------+---------------------------+------------+   -
+	#     |        |                           |            |   |
+	#     |        |                           |            |   S
+	#     |        |                           |            |   t
+	#     |        |                           |            |   a
+	#     |        |       ClipTop             |            |   c
+	#     |        |                           |            |   k
+	#     |ClipLeft|                           | ClipRight  |   H
+	#     |        |                           |            |   o
+	#     |        |                           |            |   r
+	#     |        C---------------------------+            |   i
+	#     |        |  "ClipTextBox"            |            |   z
+	#     |        |                           |            |   o
+	#     |        |                           |            |   n
+	#     |        |                           |            |   t
+	#     |        +---------------------------D            |   a
+	#     |        |    ClipBottom             |            |   l
+	#     |        |                           |            |   |
+	#     +--------+---------------------------+------------B   -
+	#
+	#              |------ StackVertical ------|
 
 	def Grayuv(x):
 		return 128
 
-	CropBox=core.std.CropAbs(clip=Clip,width=CropBoxDimension[0],height=CropBoxDimension[1],left=LeftCropBox,top=Clip.height-CropBoxElevation-CropBoxDimension[1])
 	ClipGray=core.std.Lut(clip=Clip,planes=[1,2],function=Grayuv)
 	
-	ClipLeft=core.std.Crop(clip=ClipGray,right=int((CropBox.width+ClipGray.width)/2))
-	ClipRight=core.std.Crop(clip=ClipGray,left=ClipLeft.width+CropBox.width)
-	Clip=core.std.CropAbs(clip=ClipGray,width=CropBox.width,height=ClipGray.height,left=int((ClipGray.width-CropBox.width)/2))
-	ClipTop=core.std.Crop(clip=Clip,bottom=int(CropBoxElevation*Ss)+CropBox.height)
-	ClipBottom=core.std.Crop(clip=Clip,top=ClipTop.height+CropBox.height)
+	# Divide into partial clips
+	ClipLeft=core.std.CropAbs( clip=ClipGray, width=C.x, height=ClipGray.height )
+	ClipRight=core.std.Crop( clip=ClipGray, left=D.x )
+	ClipTop=core.std.CropAbs( clip=ClipGray, width=ClipTextBox.width, height=C.y, left=C.x )
+	ClipBottom=core.std.CropAbs( clip=ClipGray, width=ClipTextBox.width, height=ClipGray.height-D.y, left=C.x, top=D.y )
 	
-	Bord=int(10*Ss)
-	Crop=core.std.Crop(clip=CropBox,left=Bord,right=Bord,top=Bord,bottom=Bord)
+	# Add white thin padding inside ClipTextBox
+	Bord=8
+	Crop=core.std.Crop(clip=ClipTextBox,left=Bord,right=Bord,top=Bord,bottom=Bord)
 	Rect=core.std.AddBorders(clip=Crop,left=Bord,right=Bord,top=Bord,bottom=Bord,color=[255,128,128])
+	
+	# Frame reconstruction
 	Clip=core.std.StackVertical([ClipTop,Rect,ClipBottom])
 	Clip=core.std.StackHorizontal([ClipLeft,Clip,ClipRight])
 	
@@ -413,7 +490,7 @@ elif Step==3:
 
 	planes = ExtractColorPlanes( Clip, FontColors )
 	
-	ClipCleaned = MergeClips( planes )
+	ClipCleaned = MergeClips( planes ) if len(planes)>1 else planes[0]
 	
 
 	# Scenedetect/BlackFrameDetect
